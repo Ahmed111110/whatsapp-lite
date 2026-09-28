@@ -274,7 +274,6 @@ class _ChatsFeedScreenState extends State<ChatsFeedScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          // شريط الأثر العائم
           if (!_isSearching) ...[
             SizedBox(
               height: 98,
@@ -311,6 +310,7 @@ class _ChatsFeedScreenState extends State<ChatsFeedScreen> {
           ],
           ...List.generate(filteredChats.length, (i) {
             final chat = filteredChats[i];
+            final unreadCount = ((chat['unread'] as num?)?.toInt() ?? 0);
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(
@@ -343,11 +343,11 @@ class _ChatsFeedScreenState extends State<ChatsFeedScreen> {
                       ),
                   ],
                 ),
-                title: Text(chat['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                title: Text(chat['name']?.toString() ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    chat['lastMsg'] as String,
+                    chat['lastMsg']?.toString() ?? '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white60, fontSize: 13),
@@ -358,14 +358,14 @@ class _ChatsFeedScreenState extends State<ChatsFeedScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      chat['time'] as String,
+                      chat['time']?.toString() ?? '',
                       style: TextStyle(
                         fontSize: 11,
-                        color: (chat['unread'] as int) > 0 ? const Color(0xFFA78BFA) : Colors.white38,
+                        color: unreadCount > 0 ? const Color(0xFFA78BFA) : Colors.white38,
                       ),
                     ),
                     const SizedBox(height: 6),
-                    if ((chat['unread'] as int) > 0)
+                    if (unreadCount > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
@@ -373,7 +373,7 @@ class _ChatsFeedScreenState extends State<ChatsFeedScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '${chat['unread']}',
+                          '$unreadCount',
                           style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -383,7 +383,7 @@ class _ChatsFeedScreenState extends State<ChatsFeedScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => AtheerChatScreen(name: chat['name'] as String),
+                      builder: (context) => AtheerChatScreen(name: chat['name']?.toString() ?? ''),
                     ),
                   ).then((_) => _loadChatsList());
                 },
@@ -432,7 +432,7 @@ class _ChatsFeedScreenState extends State<ChatsFeedScreen> {
 }
 
 // ==========================================
-// 2. شاشة المحادثة المتقدمة (وسائط، صوت، موقع، مسح)
+// 2. شاشة المحادثة المتقدمة
 // ==========================================
 class AtheerChatScreen extends StatefulWidget {
   final String name;
@@ -447,12 +447,10 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
 
-  // حالة التسجيل الصوتي
   bool _isRecording = false;
   int _recordSeconds = 0;
   Timer? _recordTimer;
 
-  // حالة تشغيل الصوت
   String? _currentlyPlayingId;
 
   @override
@@ -497,7 +495,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     await prefs.setString('chat_history_${widget.name}', jsonEncode(_messages));
   }
 
-  // حذف رسالة محددة
   void _deleteMessage(int index) {
     showDialog(
       context: context,
@@ -520,7 +517,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // مسح كامل المحادثة
   void _clearFullChat() {
     showDialog(
       context: context,
@@ -543,7 +539,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // إرسال رسالة نصية مع رد ذكي سياقي
   void _sendTextMessage() {
     final text = _msgCtrl.text.trim();
     if (text.isEmpty) return;
@@ -562,7 +557,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     });
     _persist();
 
-    // محرك الردود الذكي السياقي
     Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       String smartReply = 'أثير استلم رسالتك: "$text" ✨';
@@ -591,7 +585,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     });
   }
 
-  // التحكم ببدء وإلغاء وإرسال التسجيل الصوتي
   void _toggleRecordAudio() {
     if (_isRecording) {
       _recordTimer?.cancel();
@@ -609,7 +602,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
       });
       _persist();
 
-      // رد تفاعلي على الصوت
       Future.delayed(const Duration(seconds: 1), () {
         if (!mounted) return;
         setState(() {
@@ -642,7 +634,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     });
   }
 
-  // إرسال صورة
   void _sendImage(String imageUrl, String caption) {
     setState(() {
       _messages.add({
@@ -657,7 +648,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     _persist();
   }
 
-  // إرسال فيديو
   void _sendVideo(String title, String duration) {
     setState(() {
       _messages.add({
@@ -672,7 +662,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     _persist();
   }
 
-  // إرسال موقع
   void _sendLocation(String name, String coords) {
     setState(() {
       _messages.add({
@@ -687,7 +676,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     _persist();
   }
 
-  // نافذة المرفقات الذكية (صور، فيديو، موقع)
   void _openAttachmentSheet() {
     showModalBottomSheet(
       context: context,
@@ -709,7 +697,7 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
                   Navigator.pop(ctx);
                   _sendVideo('تسجيل فيديو بجودة فائقة', '0:34');
                 }),
-                _buildAttachIcon(Icons.location_on_rounded, 'موقع حي', Colors.emeraldAccent, () {
+                _buildAttachIcon(Icons.location_on_rounded, 'موقع حي', Colors.tealAccent, () {
                   Navigator.pop(ctx);
                   _sendLocation('موقعي الحالي (نقطة اتصال نشطة)', '31.3458° N, 34.3045° E');
                 }),
@@ -724,7 +712,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // منتقي وسائط مصغر
   void _openGalleryPicker() {
     showModalBottomSheet(
       context: context,
@@ -859,17 +846,14 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
                     },
                   ),
                 ),
-
-                // شريط التسجيل الصوتي أو شريط الإدخال العادي
                 _isRecording ? _buildRecordingBar() : _buildInputBar(),
               ],
             ),
     );
   }
 
-  // بناء نوع الفقاعة حسب المحتوى (نص، صوت، صورة، فيديو، موقع)
   Widget _buildBubble(Map<String, dynamic> msg, bool isMe) {
-    final type = msg['type'] ?? 'text';
+    final type = msg['type']?.toString() ?? 'text';
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 5),
@@ -902,20 +886,20 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
         crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           if (type == 'text')
-            Text(msg['text'] ?? '', style: const TextStyle(fontSize: 14.5, color: Colors.white, height: 1.3))
+            Text(msg['text']?.toString() ?? '', style: const TextStyle(fontSize: 14.5, color: Colors.white, height: 1.3))
           else if (type == 'audio')
-            _buildAudioPlayer(msg['id'] ?? '', msg['duration'] ?? '0:15')
+            _buildAudioPlayer(msg['id']?.toString() ?? '', msg['duration']?.toString() ?? '0:15')
           else if (type == 'image')
-            _buildImageBubble(msg['url'] ?? '', msg['caption'] ?? '')
+            _buildImageBubble(msg['url']?.toString() ?? '', msg['caption']?.toString() ?? '')
           else if (type == 'video')
-            _buildVideoBubble(msg['title'] ?? '', msg['duration'] ?? '0:30')
+            _buildVideoBubble(msg['title']?.toString() ?? '', msg['duration']?.toString() ?? '0:30')
           else if (type == 'location')
-            _buildLocationBubble(msg['name'] ?? '', msg['coords'] ?? ''),
+            _buildLocationBubble(msg['name']?.toString() ?? '', msg['coords']?.toString() ?? ''),
           const SizedBox(height: 5),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(msg['time'] ?? 'الآن', style: const TextStyle(fontSize: 10, color: Colors.white54)),
+              Text(msg['time']?.toString() ?? 'الآن', style: const TextStyle(fontSize: 10, color: Colors.white54)),
               if (isMe) ...[
                 const SizedBox(width: 4),
                 const Icon(Icons.done_all_rounded, size: 14, color: Colors.cyanAccent),
@@ -927,7 +911,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // مشغل رسالة صوتية تفاعلي
   Widget _buildAudioPlayer(String id, String duration) {
     final bool isPlaying = _currentlyPlayingId == id;
     return Row(
@@ -969,7 +952,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // فقاعة صورة قابلة للتكبير
   Widget _buildImageBubble(String url, String caption) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -996,7 +978,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // فقاعة فيديو
   Widget _buildVideoBubble(String title, String duration) {
     return Container(
       width: 220,
@@ -1028,7 +1009,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // فقاعة موقع جغرافي
   Widget _buildLocationBubble(String name, String coords) {
     return Container(
       width: 230,
@@ -1060,7 +1040,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // شريط الإدخال العادي
   Widget _buildInputBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1098,7 +1077,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // زر التسجيل الصوتي المباشر
           GestureDetector(
             onTap: _toggleRecordAudio,
             child: Container(
@@ -1112,7 +1090,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
             ),
           ),
           const SizedBox(width: 6),
-          // زر الإرسال النصي
           Container(
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
@@ -1128,7 +1105,6 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
     );
   }
 
-  // شريط التسجيل الحي
   Widget _buildRecordingBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1211,7 +1187,7 @@ class ProfileSettingsScreen extends StatefulWidget {
 }
 
 class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
-  String _name = 'مستخدم أثير';
+  String _name = 'أنس قديح';
   String _bio = 'عضو نشط في شبكة أثير الرقمية 🌌';
   bool _isLoading = true;
 

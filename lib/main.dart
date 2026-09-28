@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const AtheerApp());
@@ -188,7 +190,6 @@ class ChatsFeedScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          // شريط الحالات العائم العصري
           SizedBox(
             height: 98,
             child: ListView.builder(
@@ -254,7 +255,6 @@ class ChatsFeedScreen extends StatelessWidget {
               ],
             ),
           ),
-          // بطاقات المحادثات المتطورة
           ...List.generate(chats.length, (i) {
             final chat = chats[i];
             return Container(
@@ -268,10 +268,10 @@ class ChatsFeedScreen extends StatelessWidget {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 leading: Stack(
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       radius: 26,
-                      backgroundColor: const Color(0xFF1E283F),
-                      child: const Icon(Icons.person_rounded, color: Colors.white70, size: 28),
+                      backgroundColor: Color(0xFF1E283F),
+                      child: Icon(Icons.person_rounded, color: Colors.white70, size: 28),
                     ),
                     if (chat['online'] as bool)
                       Positioned(
@@ -354,7 +354,7 @@ class ChatsFeedScreen extends StatelessWidget {
   }
 }
 
-// ----------------- شاشة المحادثة المتقدمة (أَثِير) -----------------
+// ----------------- شاشة المحادثة مع ميزة الحفظ الدائم في الذاكرة -----------------
 class AtheerChatScreen extends StatefulWidget {
   final String name;
   const AtheerChatScreen({super.key, required this.name});
@@ -365,11 +365,41 @@ class AtheerChatScreen extends StatefulWidget {
 
 class _AtheerChatScreenState extends State<AtheerChatScreen> {
   final TextEditingController _msgCtrl = TextEditingController();
-  final List<Map<String, dynamic>> _messages = [
-    {'text': 'مرحباً! أهلاً بك في فضاء أَثِـير 🌌', 'isMe': false, 'time': '10:30 ص', 'isAudio': false},
-    {'text': 'أهلاً، التصميم الجديد خيالي جداً ومختلف كلياً!', 'isMe': true, 'time': '10:31 ص', 'isAudio': false},
-    {'text': '', 'isMe': false, 'time': '10:32 ص', 'isAudio': true},
-  ];
+  List<Map<String, dynamic>> _messages = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedMessages();
+  }
+
+  // تحميل الرسائل المحفوظة في ذاكرة الهاتف
+  Future<void> _loadSavedMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? savedData = prefs.getString('chat_history_${widget.name}');
+    if (savedData != null && savedData.isNotEmpty) {
+      final List<dynamic> decoded = jsonDecode(savedData);
+      setState(() {
+        _messages = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+        _isLoading = false;
+      });
+    } else {
+      // رسائل افتراضية تظهر لأول مرة فقط
+      setState(() {
+        _messages = [
+          {'text': 'مرحباً بك! فضاء أثير يحفظ محادثاتك بأمان ✨', 'isMe': false, 'time': '10:30 ص', 'isAudio': false},
+        ];
+        _isLoading = false;
+      });
+    }
+  }
+
+  // حفظ قائمة الرسائل تلقائياً في ذاكرة الهاتف
+  Future<void> _persistMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('chat_history_${widget.name}', jsonEncode(_messages));
+  }
 
   void _send() {
     final text = _msgCtrl.text.trim();
@@ -384,18 +414,20 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
       });
       _msgCtrl.clear();
     });
+    _persistMessages();
 
-    // رد ذكي وتفاعلي في الوقت الفعلي
+    // رد تفاعلي ذكي
     Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       setState(() {
         _messages.add({
-          'text': 'أثير استلم نبضك: "$text" ✨',
+          'text': 'أثير استلم وحفظ في الذاكرة: "$text" 🔒',
           'isMe': false,
           'time': 'الآن',
           'isAudio': false,
         });
       });
+      _persistMessages();
     });
   }
 
@@ -408,10 +440,10 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            CircleAvatar(
+            const CircleAvatar(
               radius: 19,
-              backgroundColor: const Color(0xFF1E283F),
-              child: const Icon(Icons.person, color: Colors.white70, size: 22),
+              backgroundColor: Color(0xFF1E283F),
+              child: Icon(Icons.person, color: Colors.white70, size: 22),
             ),
             const SizedBox(width: 10),
             Column(
@@ -425,7 +457,7 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
                   children: const [
                     CircleAvatar(radius: 3.5, backgroundColor: Color(0xFF10B981)),
                     SizedBox(width: 4),
-                    Text('متصل عبر أثير', style: TextStyle(fontSize: 11, color: Color(0xFF10B981))),
+                    Text('ذاكرة محلية نشطة 💾', style: TextStyle(fontSize: 11, color: Color(0xFF10B981))),
                   ],
                 ),
               ],
@@ -438,155 +470,156 @@ class _AtheerChatScreenState extends State<AtheerChatScreen> {
           IconButton(icon: const Icon(Icons.more_vert_rounded, color: Colors.white70), onPressed: () {}),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final bool isMe = msg['isMe'] as bool;
-                final bool isAudio = msg['isAudio'] as bool;
-
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 5),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.78,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: isMe
-                          ? const LinearGradient(
-                              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            )
-                          : null,
-                      color: isMe ? null : const Color(0xFF161F32),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(18),
-                        topRight: const Radius.circular(18),
-                        bottomLeft: isMe ? const Radius.circular(18) : Radius.zero,
-                        bottomRight: isMe ? Radius.zero : const Radius.circular(18),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isMe ? const Color(0xFF7C3AED).withOpacity(0.25) : Colors.black26,
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: isAudio
-                        ? Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: Color(0xFF8B5CF6),
-                                child: Icon(Icons.play_arrow_rounded, color: Colors.white),
-                              ),
-                              SizedBox(width: 8),
-                              Icon(Icons.graphic_eq_rounded, color: Colors.cyanAccent, size: 28),
-                              SizedBox(width: 8),
-                              Text('0:18', style: TextStyle(fontSize: 12, color: Colors.white70)),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                msg['text'] as String,
-                                style: const TextStyle(fontSize: 14.5, color: Colors.white, height: 1.3),
-                              ),
-                              const SizedBox(height: 5),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    msg['time'] as String,
-                                    style: const TextStyle(fontSize: 10, color: Colors.white54),
-                                  ),
-                                  if (isMe) ...[
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.done_all_rounded, size: 14, color: Colors.cyanAccent),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                  ),
-                );
-              },
-            ),
-          ),
-          // شريط إدخال حديث بنمط الكبسولة العائمة
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: const BoxDecoration(
-              color: Color(0xFF101625),
-            ),
-            child: Row(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B5CF6)))
+          : Column(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFA78BFA), size: 26),
-                  onPressed: () {},
-                ),
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A2338),
-                      borderRadius: BorderRadius.circular(25),
-                      border: Border.all(color: Colors.white.withOpacity(0.06)),
-                    ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: TextField(
-                            controller: _msgCtrl,
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
-                            decoration: const InputDecoration(
-                              hintText: 'اكتب رسالة في أثير...',
-                              hintStyle: TextStyle(color: Colors.white38),
-                              border: InputBorder.none,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _messages[index];
+                      final bool isMe = msg['isMe'] as bool;
+                      final bool isAudio = msg['isAudio'] == true;
+
+                      return Align(
+                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.78,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: isMe
+                                ? const LinearGradient(
+                                    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
+                            color: isMe ? null : const Color(0xFF161F32),
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(18),
+                              topRight: const Radius.circular(18),
+                              bottomLeft: isMe ? const Radius.circular(18) : Radius.zero,
+                              bottomRight: isMe ? Radius.zero : const Radius.circular(18),
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isMe ? const Color(0xFF7C3AED).withOpacity(0.25) : Colors.black26,
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: isAudio
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: Color(0xFF8B5CF6),
+                                      child: Icon(Icons.play_arrow_rounded, color: Colors.white),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Icon(Icons.graphic_eq_rounded, color: Colors.cyanAccent, size: 28),
+                                    SizedBox(width: 8),
+                                    Text('0:18', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                                  ],
+                                )
+                              : Column(
+                                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      msg['text'] as String,
+                                      style: const TextStyle(fontSize: 14.5, color: Colors.white, height: 1.3),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          msg['time'] as String,
+                                          style: const TextStyle(fontSize: 10, color: Colors.white54),
+                                        ),
+                                        if (isMe) ...[
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.done_all_rounded, size: 14, color: Colors.cyanAccent),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF101625),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFA78BFA), size: 26),
+                        onPressed: () {},
+                      ),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A2338),
+                            borderRadius: BorderRadius.circular(25),
+                            border: Border.all(color: Colors.white.withOpacity(0.06)),
+                          ),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: TextField(
+                                  controller: _msgCtrl,
+                                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                                  decoration: const InputDecoration(
+                                    hintText: 'اكتب رسالة في أثير...',
+                                    hintStyle: TextStyle(color: Colors.white38),
+                                    border: InputBorder.none,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.mic_none_rounded, color: Colors.white54),
+                                onPressed: () {},
+                              ),
+                            ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.mic_none_rounded, color: Colors.white54),
-                          onPressed: () {},
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                    ),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
-                    onPressed: _send,
+                        child: IconButton(
+                          icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                          onPressed: _send,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
 
-// ----------------- شاشة الأثر (اللحظات والقصص) -----------------
+// ----------------- الشاشات الفرعية -----------------
 class MomentsScreen extends StatelessWidget {
   const MomentsScreen({super.key});
 
@@ -608,7 +641,6 @@ class MomentsScreen extends StatelessWidget {
   }
 }
 
-// ----------------- شاشة المكالمات -----------------
 class CallsScreen extends StatelessWidget {
   const CallsScreen({super.key});
 
@@ -623,7 +655,6 @@ class CallsScreen extends StatelessWidget {
   }
 }
 
-// ----------------- شاشة الملف الشخصي والإعدادات -----------------
 class ProfileSettingsScreen extends StatelessWidget {
   const ProfileSettingsScreen({super.key});
 

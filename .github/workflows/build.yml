@@ -28,6 +28,18 @@ jobs:
       - name: Scaffold Android
         run: flutter create . --platforms=android --org com.chat.lite
 
+      - name: Enable Internet Permissions
+        run: |
+          python3 -c "
+          path = 'android/app/src/main/AndroidManifest.xml'
+          with open(path, 'r') as f:
+              content = f.read()
+          perms = '<uses-permission android:name=\"android.permission.INTERNET\"/>\n    <uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>\n    <application'
+          content = content.replace('<application', perms)
+          with open(path, 'w') as f:
+              f.write(content)
+          "
+
       - name: Install Dependencies
         run: flutter pub get
 

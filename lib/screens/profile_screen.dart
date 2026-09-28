@@ -1,3 +1,27 @@
+'avatar_url': avatar}),
+^^^^^^^^^
+Target kernel_snapshot_program failed: Exception
+```[span_1](start_span)[span_1](end_span)
+
+### ما هو سبب الخطأ؟
+في ملف **`lib/screens/profile_screen.dart`**، عند الضغط على زر "مراسلة"، كنا نمرر بيانات الحساب كـ:
+`_profile ?? {'id': _targetId, 'name': name, 'avatar_url': avatar}`
+
+فلاتر اعتبر القوس الثاني من نوع نصوص فقط (`Map<String, String>`) بينما شاشة الشات تطلب (`Map<String, dynamic>`)، وهذا أدى لتوقف بناء التطبيق فوراً[span_2](start_span)[span_2](end_span).
+
+---
+
+### الحل (خلال دقيقة واحدة):
+
+سنقوم بتحديث ملف **`lib/screens/profile_screen.dart`** لضبط النوع البرمجي بدقة وتفادي هذا الخطأ نهائياً.
+
+1. افتح مستودعك في **GitHub**.
+2. ادخل إلى مجلد **`lib`** ثم مجلد **`screens`**.
+3. اضغط على ملف **`profile_screen.dart`**.
+4. اضغط على القلم **✏️**.
+5. امسح الكود بالكامل وضع هذا الكود المصحح والمضبوط:
+
+```dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -13,7 +37,7 @@ import 'chat_screen.dart';
 final supabase = Supabase.instance.client;
 
 class ProfileScreen extends StatefulWidget {
-  final String? userId; // إذا كان فارغاً يفتح حساب المستخدم الحالي تلقائياً
+  final String? userId;
   final Map<String, dynamic>? initialProfile;
 
   const ProfileScreen({
@@ -53,13 +77,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final myId = supabase.auth.currentUser?.id;
 
-      // 1. جلب بيانات الحساب
       final p = await supabase.from('profiles').select().eq('id', _targetId).maybeSingle();
-
-      // 2. جلب منشورات هذا الحساب فقط
       final postsRes = await supabase.from('posts').select().eq('user_id', _targetId).order('created_at', ascending: false);
 
-      // 3. جلب حالة الصداقة إذا كان حساب مستخدم آخر
       if (!_isMyProfile && myId != null) {
         final rel = await supabase.from('friendships').select().or('and(sender_id.eq.$myId,receiver_id.eq.$_targetId),and(sender_id.eq.$_targetId,receiver_id.eq.$myId)').maybeSingle();
         if (rel != null) {
@@ -68,7 +88,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
 
-      // 4. جلب عينة من الأصدقاء لعرضها بنمط فيسبوك
       final friendsRel = await supabase.from('friendships').select('sender_id, receiver_id').or('sender_id.eq.$_targetId,receiver_id.eq.$_targetId').eq('status', 'accepted').limit(6);
       final List friendIds = [];
       for (var f in friendsRel) {
@@ -92,7 +111,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // تغيير صورة البروفايل ورفعها سحابياً وتحديثها في كل مكان فوراً
   Future<void> _changeAvatar() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 600);
     if (picked == null) return;
@@ -102,9 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final cloudUrl = await StorageService.uploadImage(file: File(picked.path), folder: 'avatars');
       if (cloudUrl != null) {
-        // تحديث جدول البروفايل
         await supabase.from('profiles').update({'avatar_url': cloudUrl}).eq('id', _targetId);
-        // تحديث صورة الكاتب في جميع منشوراته السابقة
         await supabase.from('posts').update({'author_avatar': cloudUrl}).eq('user_id', _targetId);
 
         setState(() {
@@ -118,7 +134,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // تغيير صورة الغلاف سحابياً
   Future<void> _changeCover() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 1200);
     if (picked == null) return;
@@ -139,13 +154,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // إرسال أو إدارة طلب الصداقة
   Future<void> _handleFriendAction() async {
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return;
 
     if (_isFriend) {
-      // إلغاء الصداقة
       await supabase.from('friendships').delete().or('and(sender_id.eq.$myId,receiver_id.eq.$_targetId),and(sender_id.eq.$_targetId,receiver_id.eq.$myId)');
       setState(() {
         _isFriend = false;
@@ -155,7 +168,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } else if (_requestPending) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('طلب الصداقة معلق بالفعل')));
     } else {
-      // إرسال طلب جديد
       await supabase.from('friendships').insert({
         'sender_id': myId,
         'receiver_id': _targetId,
@@ -203,14 +215,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onRefresh: _loadProfileData,
               child: ListView(
                 children: [
-                  // ==========================================
-                  // 1. غلاف الصفحة + الصورة الشخصية المتداخلة
-                  // ==========================================
                   Stack(
                     clipBehavior: Clip.none,
                     alignment: Alignment.bottomCenter,
                     children: [
-                      // صورة الغلاف أو تدرج أثير الأنيق
                       GestureDetector(
                         onTap: _isMyProfile ? _changeCover : null,
                         child: Container(
@@ -231,7 +239,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : null,
                         ),
                       ),
-                      // زر كاميرا الغلاف
                       if (_isMyProfile)
                         Positioned(
                           bottom: 12,
@@ -254,7 +261,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
-                      // الصورة الشخصية المتداخلة
                       Positioned(
                         bottom: -48,
                         child: Stack(
@@ -298,9 +304,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 56),
 
-                  // ==========================================
-                  // 2. الاسم، النبذة والشارة
-                  // ==========================================
                   Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -321,9 +324,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 14),
 
-                  // ==========================================
-                  // 3. أزرار الإجراءات (Action Buttons)
-                  // ==========================================
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
@@ -382,6 +382,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
+                          // هنا تم تصحيح نوع البيانات بدقة عالية
                           Expanded(
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
@@ -393,10 +394,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: const Icon(Icons.chat_bubble, color: FBColors.primaryBlue, size: 18),
                               label: Text('مراسلة', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
                               onPressed: () {
+                                final Map<String, dynamic> targetData = _profile != null
+                                    ? Map<String, dynamic>.from(_profile!)
+                                    : <String, dynamic>{'id': _targetId, 'name': name, 'avatar_url': avatar};
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => ChatScreen(targetUser: _profile ?? {'id': _targetId, 'name': name, 'avatar_url': avatar}),
+                                    builder: (_) => ChatScreen(targetUser: targetData),
                                   ),
                                 );
                               },
@@ -412,9 +416,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 16),
                   const Divider(thickness: 0.5),
 
-                  // ==========================================
-                  // 4. قسم التفاصيل (Details Section)
-                  // ==========================================
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     child: Column(
@@ -446,9 +447,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const Divider(thickness: 0.5),
 
-                  // ==========================================
-                  // 5. قسم شبكة الأصدقاء (Friends Grid)
-                  // ==========================================
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     child: Column(
@@ -508,9 +506,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const Divider(thickness: 0.5),
 
-                  // ==========================================
-                  // 6. منشورات الحساب فقط
-                  // ==========================================
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text('منشورات $name', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
@@ -589,7 +584,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // فتح نافذة التعديل الشاملة وتطبيق الرفع السحابي الحقيقي
   void _openFullEditModal() {
     final nameCtrl = TextEditingController(text: _profile?['name'] ?? '');
     final bioCtrl = TextEditingController(text: _profile?['bio'] ?? '');
@@ -691,7 +685,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // فتح الإعدادات وتسجيل الخروج
   void _openSettingsModal() {
     showModalBottomSheet(
       context: context,

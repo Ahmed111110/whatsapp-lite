@@ -1,20 +1,17 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// متحكم المظهر العام (نهاري / ليلي)
 final ValueNotifier<bool> isDarkModeNotifier = ValueNotifier<bool>(true);
-
-// عميل الاتصال السحابي
 final supabase = Supabase.instance.client;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تهيئة الاتصال بمشروعك السحابي
   await Supabase.initialize(
     url: 'https://jflrgszsqhptcxsxbaej.supabase.co',
     anonKey: 'sb_publishable_wgWmv7UJ4lbH_5m3UZ8FSg_l8rbAADB',
@@ -24,6 +21,24 @@ void main() async {
   isDarkModeNotifier.value = prefs.getBool('atheer_theme_dark') ?? true;
 
   runApp(const AtheerApp());
+}
+
+// دالة مساعدة لتنسيق توقيت المنشور بالعربية
+String formatPostTime(String? timestamp) {
+  if (timestamp == null) return 'الآن';
+  try {
+    final date = DateTime.parse(timestamp).toLocal();
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inSeconds < 60) return 'منذ لحظات';
+    if (diff.inMinutes < 60) return 'منذ ${diff.inMinutes} دقيقة';
+    if (diff.inHours < 24) return 'منذ ${diff.inHours} ساعة';
+    if (diff.inDays < 7) return 'منذ ${diff.inDays} يوم';
+    return '${date.year}/${date.month}/${date.day}';
+  } catch (_) {
+    return 'مؤخراً';
+  }
 }
 
 class AtheerApp extends StatelessWidget {
@@ -62,7 +77,6 @@ class AtheerApp extends StatelessWidget {
               titleTextStyle: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
             ),
           ),
-          // فحص حالة الجلسة: إذا كان المستخدم مسجلاً يفتح التطبيق مباشرة وإلا تظهر شاشة الدخول
           home: const AuthGate(),
         );
       },
@@ -70,9 +84,6 @@ class AtheerApp extends StatelessWidget {
   }
 }
 
-// ==========================================
-// 1. بوابة فحص المستخدم (Auth Gate)
-// ==========================================
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -91,9 +102,6 @@ class AuthGate extends StatelessWidget {
   }
 }
 
-// ==========================================
-// 2. شاشة تسجيل الدخول وإنشاء الحساب
-// ==========================================
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -133,7 +141,7 @@ class _AuthScreenState extends State<AuthScreen> {
           await supabase.from('profiles').upsert({
             'id': res.user!.id,
             'name': name,
-            'bio': isFounder ? 'المؤسس والمطور لمنصة وشبكة أثير 👑⚡' : 'عضو في فضاء أثير 🌌',
+            'bio': isFounder ? 'المؤسس والمطور لمنصة أثير 👑⚡' : 'عضو في فضاء أثير 🌌',
             'is_founder': isFounder,
           });
         }
@@ -168,15 +176,9 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: const Icon(Icons.bubble_chart_rounded, size: 48, color: Colors.white),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'أَثِـيـر',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2),
-              ),
+              const Text('أَثِـيـر', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2)),
               const SizedBox(height: 6),
-              const Text(
-                'فضاء التواصل السحابي المضيء',
-                style: TextStyle(color: Color(0xFFA78BFA), fontSize: 13),
-              ),
+              const Text('فضاء التواصل السحابي المضيء', style: TextStyle(color: Color(0xFFA78BFA), fontSize: 13)),
               const SizedBox(height: 36),
               Container(
                 padding: const EdgeInsets.all(22),
@@ -241,10 +243,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         onPressed: _loading ? null : _submit,
                         child: _loading
                             ? const CircularProgressIndicator(color: Colors.white)
-                            : Text(
-                                _isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                              ),
+                            : Text(_isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                       ),
                     ),
                   ],
@@ -266,9 +265,6 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-// ==========================================
-// 3. الشاشة الرئيسية والتبويبات
-// ==========================================
 class FacebookStyleMain extends StatefulWidget {
   const FacebookStyleMain({super.key});
 
@@ -320,7 +316,7 @@ class _FacebookStyleMainState extends State<FacebookStyleMain> {
 }
 
 // ==========================================
-// 4. الخلاصة السحابية المباشرة (Cloud Feed)
+// الخلاصة السحابية المحدثة
 // ==========================================
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -383,9 +379,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
           return Padding(
             padding: EdgeInsets.only(
-              left: 18,
-              right: 18,
-              top: 20,
+              left: 18, right: 18, top: 20,
               bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
             ),
             child: Column(
@@ -412,7 +406,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 const SizedBox(height: 14),
                 TextField(
                   controller: textCtrl,
-                  maxLines: 3,
+                  maxLines: 4,
                   decoration: InputDecoration(
                     hintText: 'انشر أثرك في السيرفر السحابي...',
                     hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
@@ -480,10 +474,112 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
+  // نافذة التعليقات الحقيقية
+  void _openCommentsModal(String postId) {
+    final commentCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.65,
+            padding: EdgeInsets.only(
+              left: 16, right: 16, top: 16,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 12,
+            ),
+            child: Column(
+              children: [
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.4), borderRadius: BorderRadius.circular(4))),
+                const SizedBox(height: 12),
+                const Text('التعليقات 💬', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Divider(),
+                Expanded(
+                  child: FutureBuilder(
+                    future: supabase.from('comments').select().eq('post_id', postId).order('created_at', ascending: true),
+                    builder: (context, AsyncSnapshot snapshot) {
+                      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED)));
+                      final comments = snapshot.data as List;
+                      if (comments.isEmpty) return const Center(child: Text('لا توجد تعليقات بعد، كن أول المعلقين!'));
+
+                      return ListView.builder(
+                        itemCount: comments.length,
+                        itemBuilder: (c, i) {
+                          final cm = comments[i];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: const Color(0xFF7C3AED),
+                              child: Text((cm['author_name'] ?? 'م')[0], style: const TextStyle(color: Colors.white, fontSize: 12)),
+                            ),
+                            title: Text(cm['author_name'] ?? 'مستخدم', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            subtitle: Text(cm['content'] ?? '', style: const TextStyle(fontSize: 13)),
+                            trailing: Text(formatPostTime(cm['created_at']), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: commentCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'اكتب تعليقك هنا...',
+                          hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1A2338) : const Color(0xFFF1F5F9),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.send_rounded, color: Color(0xFF7C3AED)),
+                      onPressed: () async {
+                        final val = commentCtrl.text.trim();
+                        if (val.isNotEmpty) {
+                          final user = supabase.auth.currentUser;
+                          await supabase.from('comments').insert({
+                            'post_id': postId,
+                            'user_id': user?.id,
+                            'author_name': _currentUserName,
+                            'content': val,
+                          });
+                          commentCtrl.clear();
+                          setModalState(() {});
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _likePost(Map<String, dynamic> post) async {
     final int currentLikes = post['likes_count'] ?? 0;
     await supabase.from('posts').update({'likes_count': currentLikes + 1}).eq('id', post['id']);
     _loadPosts();
+  }
+
+  void _sharePost(Map<String, dynamic> post) {
+    final text = '${post['author_name']}:\n${post['text']}\n\nنُشر عبر تطبيق أثير 🌌';
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ نص المنشور بنجاح لمشاركته!'), duration: Duration(seconds: 2)),
+    );
   }
 
   @override
@@ -526,7 +622,6 @@ class _FeedScreenState extends State<FeedScreen> {
               onRefresh: _loadPosts,
               child: ListView(
                 children: [
-                  // شريط إنشاء المنشور
                   Container(
                     margin: const EdgeInsets.all(12),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -562,11 +657,10 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
 
-                  // قائمة المنشورات السحابية
                   if (_posts.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(40),
-                      child: Center(child: Text('لا توجد منشورات سحابية بعد! كن أول من ينشر أثراً.')),
+                      child: Center(child: Text('لا توجد منشورات بعد! كن أول من ينشر أثراً.')),
                     )
                   else
                     ..._posts.map((post) {
@@ -604,7 +698,8 @@ class _FeedScreenState extends State<FeedScreen> {
                                   ],
                                 ],
                               ),
-                              subtitle: const Text('سحابي • 🌐 عام', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              // عرض توقيت النشر الحقيقي والتلقائي
+                              subtitle: Text('${formatPostTime(post['created_at'])} • 🌐 عام', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                             ),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -614,8 +709,9 @@ class _FeedScreenState extends State<FeedScreen> {
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
                                 children: [
+                                  // زر الإعجاب
                                   InkWell(
                                     onTap: () => _likePost(post),
                                     child: Row(
@@ -626,7 +722,28 @@ class _FeedScreenState extends State<FeedScreen> {
                                       ],
                                     ),
                                   ),
-                                  const Text('تعليق 💬', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                  // زر التعليق الفعّال
+                                  InkWell(
+                                    onTap: () => _openCommentsModal(post['id']),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.comment_rounded, size: 16, color: Colors.grey),
+                                        SizedBox(width: 6),
+                                        Text('تعليق', style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                  // زر المشاركة
+                                  InkWell(
+                                    onTap: () => _sharePost(post),
+                                    child: const Row(
+                                      children: [
+                                        Icon(Icons.share_rounded, size: 16, color: Colors.grey),
+                                        SizedBox(width: 6),
+                                        Text('مشاركة', style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -642,7 +759,7 @@ class _FeedScreenState extends State<FeedScreen> {
 }
 
 // ==========================================
-// 5. استكشاف ومتابعة الأصدقاء (Follow System)
+// استكشاف ومتابعة الأصدقاء
 // ==========================================
 class ExploreUsersScreen extends StatefulWidget {
   const ExploreUsersScreen({super.key});
@@ -735,9 +852,6 @@ class _ExploreUsersScreenState extends State<ExploreUsersScreen> {
   }
 }
 
-// ==========================================
-// 6. الإشعارات والحساب الشخصي مع تسجيل الخروج
-// ==========================================
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
@@ -752,6 +866,9 @@ class NotificationsScreen extends StatelessWidget {
   }
 }
 
+// ==========================================
+// الملف الشخصي المتكامل مع تعديل البيانات
+// ==========================================
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -760,9 +877,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _name = 'مستخدم أثير';
-  String _bio = 'عضو في شبكة أثير 🌌';
-  bool _isFounder = false;
+  Map<String, dynamic>? _profile;
+  bool _loading = true;
 
   @override
   void initState() {
@@ -771,25 +887,124 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
+    setState(() => _loading = true);
     final user = supabase.auth.currentUser;
     if (user != null) {
       final res = await supabase.from('profiles').select().eq('id', user.id).maybeSingle();
-      if (res != null) {
-        setState(() {
-          _name = res['name'] ?? 'مستخدم أثير';
-          _bio = res['bio'] ?? '';
-          _isFounder = res['is_founder'] ?? false;
-        });
-      }
+      setState(() {
+        _profile = res;
+        _loading = false;
+      });
     }
+  }
+
+  void _editProfileModal() {
+    final nameCtrl = TextEditingController(text: _profile?['name'] ?? '');
+    final bioCtrl = TextEditingController(text: _profile?['bio'] ?? '');
+    final workCtrl = TextEditingController(text: _profile?['work'] ?? '');
+    final eduCtrl = TextEditingController(text: _profile?['education'] ?? '');
+    final locCtrl = TextEditingController(text: _profile?['location'] ?? '');
+    final birthCtrl = TextEditingController(text: _profile?['birth_date'] ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 18, right: 18, top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('تعديل الملف الشخصي ✏️', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'الاسم الكامل', prefixIcon: Icon(Icons.person)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: bioCtrl,
+                decoration: const InputDecoration(labelText: 'نبذة عنك (Bio)', prefixIcon: Icon(Icons.info_outline)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: workCtrl,
+                decoration: const InputDecoration(labelText: 'العمل والمهنة', prefixIcon: Icon(Icons.work_outline)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: eduCtrl,
+                decoration: const InputDecoration(labelText: 'التعليم والدراسة', prefixIcon: Icon(Icons.school_outlined)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: locCtrl,
+                decoration: const InputDecoration(labelText: 'مكان الإقامة والسكن', prefixIcon: Icon(Icons.location_on_outlined)),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: birthCtrl,
+                decoration: const InputDecoration(labelText: 'تاريخ الميلاد', prefixIcon: Icon(Icons.cake_outlined)),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                  onPressed: () async {
+                    final user = supabase.auth.currentUser;
+                    if (user != null) {
+                      await supabase.from('profiles').upsert({
+                        'id': user.id,
+                        'name': nameCtrl.text.trim(),
+                        'bio': bioCtrl.text.trim(),
+                        'work': workCtrl.text.trim(),
+                        'education': eduCtrl.text.trim(),
+                        'location': locCtrl.text.trim(),
+                        'birth_date': birthCtrl.text.trim(),
+                      });
+                      Navigator.pop(ctx);
+                      _loadProfile();
+                    }
+                  },
+                  child: const Text('حفظ التعديلات في السيرفر', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = supabase.auth.currentUser;
+    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF7C3AED))));
+
+    final name = _profile?['name'] ?? 'مستخدم أثير';
+    final bio = _profile?['bio'] ?? 'عضو في فضاء أثير';
+    final bool isFounder = _profile?['is_founder'] ?? false;
+    final work = _profile?['work'] ?? '';
+    final edu = _profile?['education'] ?? '';
+    final loc = _profile?['location'] ?? '';
+    final birth = _profile?['birth_date'] ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('ملفي السحابي', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(
+        title: const Text('الملف الشخصي', style: TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_note_rounded, color: Color(0xFF7C3AED), size: 28),
+            onPressed: _editProfileModal,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -797,25 +1012,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: CircleAvatar(
               radius: 46,
               backgroundColor: const Color(0xFF7C3AED),
-              child: Text(_name.isNotEmpty ? _name[0] : 'أ', style: const TextStyle(fontSize: 40, color: Colors.white, fontWeight: FontWeight.bold)),
+              child: Text(name.isNotEmpty ? name[0] : 'أ', style: const TextStyle(fontSize: 40, color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              if (_isFounder) ...[
+              Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              if (isFounder) ...[
                 const SizedBox(width: 6),
-                const Icon(Icons.verified_rounded, color: Color(0xFFF59E0B), size: 20),
+                const Icon(Icons.verified_rounded, color: Color(0xFFF59E0B), size: 22),
               ],
             ],
           ),
           const SizedBox(height: 4),
-          Center(child: Text(_bio, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7C3AED), fontSize: 13))),
+          Center(child: Text(bio, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF7C3AED), fontSize: 13))),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED).withOpacity(0.12),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            icon: const Icon(Icons.edit, color: Color(0xFF7C3AED), size: 18),
+            label: const Text('تعديل بياناتي وصورتي', style: TextStyle(color: Color(0xFF7C3AED), fontWeight: FontWeight.bold)),
+            onPressed: _editProfileModal,
+          ),
+          const SizedBox(height: 20),
+          const Divider(),
+          const Text('معلومات الحساب:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           const SizedBox(height: 10),
-          Center(child: Text(user?.email ?? '', style: const TextStyle(color: Colors.grey, fontSize: 12))),
-          const SizedBox(height: 28),
+          if (work.isNotEmpty) ListTile(leading: const Icon(Icons.work_outline, color: Color(0xFF7C3AED)), title: const Text('العمل'), subtitle: Text(work)),
+          if (edu.isNotEmpty) ListTile(leading: const Icon(Icons.school_outlined, color: Color(0xFF7C3AED)), title: const Text('الدراسة والتعليم'), subtitle: Text(edu)),
+          if (loc.isNotEmpty) ListTile(leading: const Icon(Icons.location_on_outlined, color: Color(0xFF7C3AED)), title: const Text('مكان الإقامة'), subtitle: Text(loc)),
+          if (birth.isNotEmpty) ListTile(leading: const Icon(Icons.cake_outlined, color: Color(0xFF7C3AED)), title: const Text('تاريخ الميلاد'), subtitle: Text(birth)),
+          const SizedBox(height: 24),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent.withOpacity(0.15),

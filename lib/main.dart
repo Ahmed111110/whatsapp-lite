@@ -1,387 +1,378 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const WhatsAppLiteApp());
+  runApp(const AtheerApp());
 }
 
-class WhatsAppLiteApp extends StatelessWidget {
-  const WhatsAppLiteApp({super.key});
+class AtheerApp extends StatelessWidget {
+  const AtheerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'واتساب لايت',
+      title: 'أَثِـيـر',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121B22),
+        scaffoldBackgroundColor: const Color(0xFF0B0F19),
+        primaryColor: const Color(0xFF7C3AED),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1F2C34),
+          backgroundColor: Color(0xFF0B0F19),
           elevation: 0,
         ),
       ),
-      home: const MainHomeScreen(),
+      home: const MainNavigationScreen(),
     );
   }
 }
 
-class MainHomeScreen extends StatefulWidget {
-  const MainHomeScreen({super.key});
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key});
 
   @override
-  State<MainHomeScreen> createState() => _MainHomeScreenState();
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainHomeScreenState extends State<MainHomeScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  int _currentIndex = 0;
+
+  final List<Widget> _pages = const [
+    ChatsFeedScreen(),
+    MomentsScreen(),
+    CallsScreen(),
+    ProfileSettingsScreen(),
+  ];
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_currentIndex],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF131A2A),
+          border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06), width: 1)),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: const Color(0xFF8B5CF6),
+          unselectedItemColor: Colors.white38,
+          selectedFontSize: 12,
+          unselectedFontSize: 11,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_rounded),
+              activeIcon: Icon(Icons.chat_bubble_rounded, shadows: [Shadow(color: Color(0xFF8B5CF6), blurRadius: 10)]),
+              label: 'الدردشات',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.motion_photos_on_rounded),
+              label: 'الأثر',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.phone_in_talk_rounded),
+              label: 'المكالمات',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_rounded),
+              label: 'حسابي',
+            ),
+          ],
+        ),
+      ),
+    );
   }
+}
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+// ----------------- الشاشة الرئيسية للدردشات -----------------
+class ChatsFeedScreen extends StatelessWidget {
+  const ChatsFeedScreen({super.key});
+
+  final List<Map<String, dynamic>> stories = const [
+    {'name': 'أنت', 'isUser': true},
+    {'name': 'سليمان', 'isUser': false},
+    {'name': 'محمود', 'isUser': false},
+    {'name': 'إبراهيم', 'isUser': false},
+    {'name': 'عماد', 'isUser': false},
+  ];
+
+  final List<Map<String, dynamic>> chats = const [
+    {
+      'name': 'أحمد قديح',
+      'lastMsg': 'تم مراجعة الفكرة والتصميم ممتاز جداً 🚀',
+      'time': '10:45 ص',
+      'unread': 2,
+      'online': true,
+    },
+    {
+      'name': 'مجموعة التطوير والنقاش',
+      'lastMsg': 'صوتية: 0:24 دقيقة 🎙️',
+      'time': '09:20 ص',
+      'unread': 0,
+      'online': false,
+    },
+    {
+      'name': 'مهندس جهاد',
+      'lastMsg': 'إن شاء الله نلتقي اليوم على الموعد',
+      'time': 'أمس',
+      'unread': 0,
+      'online': true,
+    },
+    {
+      'name': 'سليمان أبو الفهد',
+      'lastMsg': 'السلام عليكم، طمني كيف الأخبار عندك؟',
+      'time': 'الأحد',
+      'unread': 1,
+      'online': false,
+    },
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'واتساب',
-          style: TextStyle(
-            fontSize: 21,
-            fontWeight: FontWeight.bold,
-            color: Colors.white70,
-          ),
-        ),
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: const Color(0xFF00A884),
-          indicatorWeight: 3.5,
-          labelColor: const Color(0xFF00A884),
-          unselectedLabelColor: Colors.white60,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          tabs: const [
-            Tab(text: 'الدردشات'),
-            Tab(text: 'المستجدات'),
-            Tab(text: 'المكالمات'),
+        titleSpacing: 20,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.bubble_chart_rounded, size: 20, color: Colors.white),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'أَثِـيـر',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+                color: Colors.white,
+              ),
+            ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B2438),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.search_rounded, size: 20, color: Colors.white70),
+            ),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B2438),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.tune_rounded, size: 20, color: Colors.white70),
+            ),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [
-          ChatsTab(),
-          StatusTab(),
-          CallsTab(),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        children: [
+          // شريط الحالات العائم العصري
+          SizedBox(
+            height: 98,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              itemCount: stories.length,
+              itemBuilder: (context, index) {
+                final st = stories[index];
+                final bool isUser = st['isUser'] as bool;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(2.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: isUser
+                              ? null
+                              : const LinearGradient(
+                                  colors: [Color(0xFF06B6D4), Color(0xFF8B5CF6)],
+                                ),
+                          border: isUser ? Border.all(color: Colors.white24, width: 1.5) : null,
+                        ),
+                        child: CircleAvatar(
+                          radius: 27,
+                          backgroundColor: const Color(0xFF1B2438),
+                          child: Icon(
+                            isUser ? Icons.add_rounded : Icons.person_rounded,
+                            color: isUser ? const Color(0xFF8B5CF6) : Colors.white70,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        st['name'] as String,
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'المحادثات المباشرة',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white54),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8B5CF6).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text('4 نشطة', style: TextStyle(color: Color(0xFFA78BFA), fontSize: 11)),
+                ),
+              ],
+            ),
+          ),
+          // بطاقات المحادثات المتطورة
+          ...List.generate(chats.length, (i) {
+            final chat = chats[i];
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF131A2A),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(0.04)),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                leading: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: const Color(0xFF1E283F),
+                      child: const Icon(Icons.person_rounded, color: Colors.white70, size: 28),
+                    ),
+                    if (chat['online'] as bool)
+                      Positioned(
+                        bottom: 2,
+                        right: 2,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF0B0F19), width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                title: Text(
+                  chat['name'] as String,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    chat['lastMsg'] as String,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white60, fontSize: 13),
+                  ),
+                ),
+                trailing: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      chat['time'] as String,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: (chat['unread'] as int) > 0 ? const Color(0xFFA78BFA) : Colors.white38,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    if ((chat['unread'] as int) > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${chat['unread']}',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AtheerChatScreen(name: chat['name'] as String),
+                    ),
+                  );
+                },
+              ),
+            );
+          }),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF00A884),
+        backgroundColor: const Color(0xFF7C3AED),
+        elevation: 6,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 28),
         onPressed: () {},
-        child: const Icon(Icons.chat, color: Colors.black),
       ),
     );
   }
 }
 
-// ----------------- تبويب الدردشات -----------------
-class ChatsTab extends StatelessWidget {
-  const ChatsTab({super.key});
-
-  final List<Map<String, dynamic>> chats = const [
-    {
-      'name': 'أحمد علي',
-      'message': 'السلام عليكم، كيف الأمور معك؟',
-      'time': '10:42 ص',
-      'unread': 2,
-    },
-    {
-      'name': 'مجموعة العمل',
-      'message': 'تم رفع النسخة الجديدة للتجربة 👍',
-      'time': '09:15 ص',
-      'unread': 0,
-    },
-    {
-      'name': 'محمود',
-      'message': 'تمام، بنحكي بالليل إن شاء الله',
-      'time': 'أمس',
-      'unread': 0,
-    },
-    {
-      'name': 'خالد سليم',
-      'message': 'صورة 📷',
-      'time': 'الأحد',
-      'unread': 1,
-    },
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      itemCount: chats.length,
-      separatorBuilder: (context, index) => const Divider(
-        color: Colors.white10,
-        indent: 75,
-        height: 1,
-      ),
-      itemBuilder: (context, index) {
-        final chat = chats[index];
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: const CircleAvatar(
-            radius: 26,
-            backgroundColor: Color(0xFF00A884),
-            child: Icon(Icons.person, color: Colors.white, size: 30),
-          ),
-          title: Text(
-            chat['name'],
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          subtitle: Text(
-            chat['message'],
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white60),
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                chat['time'],
-                style: TextStyle(
-                  fontSize: 12,
-                  color: chat['unread'] > 0 ? const Color(0xFF00A884) : Colors.white38,
-                ),
-              ),
-              if (chat['unread'] > 0) ...[
-                const SizedBox(height: 5),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF00A884),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '${chat['unread']}',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatDetailScreen(userName: chat['name']),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-// ----------------- تبويب الحالات (المستجدات) -----------------
-class StatusTab extends StatelessWidget {
-  const StatusTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        // حالتي
-        ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: Stack(
-            children: [
-              const CircleAvatar(
-                radius: 27,
-                backgroundColor: Colors.white24,
-                child: Icon(Icons.person, color: Colors.white, size: 32),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF00A884),
-                    shape: BoxShape.circle,
-                  ),
-                  padding: const EdgeInsets.all(2),
-                  child: const Icon(Icons.add, size: 18, color: Colors.black),
-                ),
-              ),
-            ],
-          ),
-          title: const Text('حالتي', style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: const Text('انقر لإضافة تحديث للحالة', style: TextStyle(color: Colors.white54)),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            'آخر المستجدات',
-            style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold),
-          ),
-        ),
-        // قائمة حالات الأصدقاء
-        _buildStatusItem('أحمد علي', 'منذ 15 دقيقة'),
-        _buildStatusItem('محمود', 'منذ ساعة'),
-        _buildStatusItem('سارة إبراهيم', 'اليوم 8:30 ص'),
-      ],
-    );
-  }
-
-  Widget _buildStatusItem(String name, String time) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Container(
-        padding: const EdgeInsets.all(2.5),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF00A884), width: 2.5),
-        ),
-        child: const CircleAvatar(
-          radius: 24,
-          backgroundColor: Color(0xFF1F2C34),
-          child: Icon(Icons.person, color: Colors.white70),
-        ),
-      ),
-      title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(time, style: const TextStyle(color: Colors.white54)),
-    );
-  }
-}
-
-// ----------------- تبويب المكالمات -----------------
-class CallsTab extends StatelessWidget {
-  const CallsTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      children: const [
-        ListTile(
-          leading: CircleAvatar(
-            radius: 26,
-            backgroundColor: Color(0xFF00A884),
-            child: Icon(Icons.link, color: Colors.black),
-          ),
-          title: Text('إنشاء رابط مكالمة', style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text('شارك رابطاً لمكالمتك على واتساب', style: TextStyle(color: Colors.white54)),
-        ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            'الأخيرة',
-            style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold),
-          ),
-        ),
-        _CallItem(
-          name: 'محمود',
-          time: 'اليوم، 10:15 ص',
-          isMissed: true,
-          isVideo: false,
-        ),
-        _CallItem(
-          name: 'أحمد علي',
-          time: 'أمس، 8:20 م',
-          isMissed: false,
-          isVideo: true,
-        ),
-        _CallItem(
-          name: 'خالد سليم',
-          time: '24 سبتمبر، 11:00 ص',
-          isMissed: false,
-          isVideo: false,
-        ),
-      ],
-    );
-  }
-}
-
-class _CallItem extends StatelessWidget {
+// ----------------- شاشة المحادثة المتقدمة (أَثِير) -----------------
+class AtheerChatScreen extends StatefulWidget {
   final String name;
-  final String time;
-  final bool isMissed;
-  final bool isVideo;
-
-  const _CallItem({
-    required this.name,
-    required this.time,
-    required this.isMissed,
-    required this.isVideo,
-  });
+  const AtheerChatScreen({super.key, required this.name});
 
   @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: const CircleAvatar(
-        radius: 26,
-        backgroundColor: Colors.white24,
-        child: Icon(Icons.person, color: Colors.white),
-      ),
-      title: Text(
-        name,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: isMissed ? Colors.redAccent : Colors.white,
-        ),
-      ),
-      subtitle: Row(
-        children: [
-          Icon(
-            isMissed ? Icons.call_missed : Icons.call_received,
-            size: 16,
-            color: isMissed ? Colors.redAccent : const Color(0xFF00A884),
-          ),
-          const SizedBox(width: 5),
-          Text(time, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-        ],
-      ),
-      trailing: Icon(
-        isVideo ? Icons.videocam : Icons.call,
-        color: const Color(0xFF00A884),
-      ),
-    );
-  }
+  State<AtheerChatScreen> createState() => _AtheerChatScreenState();
 }
 
-// ----------------- شاشة المحادثة الفردية والرد التفاعلي -----------------
-class ChatDetailScreen extends StatefulWidget {
-  final String userName;
-  const ChatDetailScreen({super.key, required this.userName});
-
-  @override
-  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
-}
-
-class _ChatDetailScreenState extends State<ChatDetailScreen> {
-  final TextEditingController _controller = TextEditingController();
+class _AtheerChatScreenState extends State<AtheerChatScreen> {
+  final TextEditingController _msgCtrl = TextEditingController();
   final List<Map<String, dynamic>> _messages = [
-    {'text': 'أهلاً بك! كيف حالك؟', 'isMe': false, 'time': '10:30 ص'},
-    {'text': 'الحمد لله تمام، كيفك أنت؟', 'isMe': true, 'time': '10:32 ص'},
-    {'text': 'كل الأمور ماشية بالتمام إن شاء الله', 'isMe': false, 'time': '10:33 ص'},
+    {'text': 'مرحباً! أهلاً بك في فضاء أَثِـير 🌌', 'isMe': false, 'time': '10:30 ص', 'isAudio': false},
+    {'text': 'أهلاً، التصميم الجديد خيالي جداً ومختلف كلياً!', 'isMe': true, 'time': '10:31 ص', 'isAudio': false},
+    {'text': '', 'isMe': false, 'time': '10:32 ص', 'isAudio': true},
   ];
 
-  void _sendMessage() {
-    final text = _controller.text.trim();
+  void _send() {
+    final text = _msgCtrl.text.trim();
     if (text.isEmpty) return;
 
     setState(() {
@@ -389,190 +380,285 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         'text': text,
         'isMe': true,
         'time': 'الآن',
+        'isAudio': false,
       });
-      _controller.clear();
+      _msgCtrl.clear();
     });
 
-    // رد تلقائي تفاعلي بعد ثانية واحدة لإعطاء شعور المحادثة الحقيقية
-    Future.delayed(const Duration(seconds: 1), () {
+    // رد ذكي وتفاعلي في الوقت الفعلي
+    Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       setState(() {
         _messages.add({
-          'text': 'وصلت رسالتك تمام: "$text" 👍',
+          'text': 'أثير استلم نبضك: "$text" ✨',
           'isMe': false,
           'time': 'الآن',
+          'isAudio': false,
         });
       });
     });
   }
 
-  void _showAttachmentSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1F2C34),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildAttachBtn(Icons.insert_drive_file, 'مستند', Colors.indigo),
-              _buildAttachBtn(Icons.camera_alt, 'كاميرا', Colors.pinkAccent),
-              _buildAttachBtn(Icons.image, 'معرض', Colors.purpleAccent),
-              _buildAttachBtn(Icons.location_on, 'موقع', Colors.green),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildAttachBtn(IconData icon, String label, Color color) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CircleAvatar(
-          radius: 27,
-          backgroundColor: color,
-          child: Icon(icon, color: Colors.white, size: 26),
-        ),
-        const SizedBox(height: 6),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF090D15),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF101625),
         titleSpacing: 0,
         title: Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 19,
-              backgroundColor: Color(0xFF00A884),
-              child: Icon(Icons.person, color: Colors.white, size: 22),
+              backgroundColor: const Color(0xFF1E283F),
+              child: const Icon(Icons.person, color: Colors.white70, size: 22),
             ),
             const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.userName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const Text(
-                    'متصل الآن',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF00A884)),
-                  ),
-                ],
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.name,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                Row(
+                  children: const [
+                    CircleAvatar(radius: 3.5, backgroundColor: Color(0xFF10B981)),
+                    SizedBox(width: 4),
+                    Text('متصل عبر أثير', style: TextStyle(fontSize: 11, color: Color(0xFF10B981))),
+                  ],
+                ),
+              ],
             ),
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.videocam), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.call), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.videocam_rounded, color: Colors.white70), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.phone_rounded, color: Colors.white70), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.more_vert_rounded, color: Colors.white70), onPressed: () {}),
         ],
       ),
       body: Column(
         children: [
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final msg = _messages[index];
-                final isMe = msg['isMe'] as bool;
+                final bool isMe = msg['isMe'] as bool;
+                final bool isAudio = msg['isAudio'] as bool;
+
                 return Align(
                   alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    margin: const EdgeInsets.symmetric(vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                      maxWidth: MediaQuery.of(context).size.width * 0.78,
                     ),
                     decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFF005C4B) : const Color(0xFF1F2C34),
+                      gradient: isMe
+                          ? const LinearGradient(
+                              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      color: isMe ? null : const Color(0xFF161F32),
                       borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(12),
-                        topRight: const Radius.circular(12),
-                        bottomLeft: isMe ? const Radius.circular(12) : Radius.zero,
-                        bottomRight: isMe ? Radius.zero : const Radius.circular(12),
+                        topLeft: const Radius.circular(18),
+                        topRight: const Radius.circular(18),
+                        bottomLeft: isMe ? const Radius.circular(18) : Radius.zero,
+                        bottomRight: isMe ? Radius.zero : const Radius.circular(18),
                       ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          msg['text'],
-                          style: const TextStyle(fontSize: 15, color: Colors.white),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              msg['time'],
-                              style: const TextStyle(fontSize: 10, color: Colors.white54),
-                            ),
-                            if (isMe) ...[
-                              const SizedBox(width: 4),
-                              const Icon(Icons.done_all, size: 14, color: Colors.lightBlueAccent),
-                            ],
-                          ],
+                      boxShadow: [
+                        BoxShadow(
+                          color: isMe ? const Color(0xFF7C3AED).withOpacity(0.25) : Colors.black26,
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
                         ),
                       ],
                     ),
+                    child: isAudio
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              CircleAvatar(
+                                radius: 18,
+                                backgroundColor: Color(0xFF8B5CF6),
+                                child: Icon(Icons.play_arrow_rounded, color: Colors.white),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(Icons.graphic_eq_rounded, color: Colors.cyanAccent, size: 28),
+                              SizedBox(width: 8),
+                              Text('0:18', style: TextStyle(fontSize: 12, color: Colors.white70)),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                msg['text'] as String,
+                                style: const TextStyle(fontSize: 14.5, color: Colors.white, height: 1.3),
+                              ),
+                              const SizedBox(height: 5),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    msg['time'] as String,
+                                    style: const TextStyle(fontSize: 10, color: Colors.white54),
+                                  ),
+                                  if (isMe) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.done_all_rounded, size: 14, color: Colors.cyanAccent),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
                   ),
                 );
               },
             ),
           ),
+          // شريط إدخال حديث بنمط الكبسولة العائمة
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            color: const Color(0xFF1F2C34),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: const BoxDecoration(
+              color: Color(0xFF101625),
+            ),
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.attach_file, color: Colors.white70),
-                  onPressed: _showAttachmentSheet,
+                  icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFA78BFA), size: 26),
+                  onPressed: () {},
                 ),
                 Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'مراسلة...',
-                      hintStyle: const TextStyle(color: Colors.white38),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFF2A3942),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2338),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: Colors.white.withOpacity(0.06)),
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: TextField(
+                            controller: _msgCtrl,
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            decoration: const InputDecoration(
+                              hintText: 'اكتب رسالة في أثير...',
+                              hintStyle: TextStyle(color: Colors.white38),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.mic_none_rounded, color: Colors.white54),
+                          onPressed: () {},
+                        ),
+                      ],
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                CircleAvatar(
-                  radius: 23,
-                  backgroundColor: const Color(0xFF00A884),
+                Container(
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                    ),
+                  ),
                   child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.black, size: 20),
-                    onPressed: _sendMessage,
+                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                    onPressed: _send,
                   ),
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ----------------- شاشة الأثر (اللحظات والقصص) -----------------
+class MomentsScreen extends StatelessWidget {
+  const MomentsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('الأثر والمستجدات', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.auto_awesome_rounded, size: 60, color: Color(0xFF8B5CF6)),
+            SizedBox(height: 14),
+            Text('مساحة اللحظات والقصص المضيئة', style: TextStyle(fontSize: 16, color: Colors.white70)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ----------------- شاشة المكالمات -----------------
+class CallsScreen extends StatelessWidget {
+  const CallsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('سجل الاتصالات', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: const Center(
+        child: Text('لا توجد مكالمات فائتة حالياً', style: TextStyle(color: Colors.white54)),
+      ),
+    );
+  }
+}
+
+// ----------------- شاشة الملف الشخصي والإعدادات -----------------
+class ProfileSettingsScreen extends StatelessWidget {
+  const ProfileSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('الملف الشخصي', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Center(
+            child: Stack(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: [Color(0xFF06B6D4), Color(0xFF8B5CF6)]),
+                  ),
+                  child: const CircleAvatar(
+                    radius: 46,
+                    backgroundColor: Color(0xFF1E283F),
+                    child: Icon(Icons.person, size: 50, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Center(
+            child: Text('مستخدم أثير', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 4),
+          const Center(
+            child: Text('عضو نشط في شبكة أثير', style: TextStyle(color: Color(0xFFA78BFA), fontSize: 13)),
           ),
         ],
       ),

@@ -35,10 +35,11 @@ void main() async {
   runApp(const AtheerApp());
 }
 
-String formatArabicTime(String? timestamp) {
+// دالة مساعدة لحساب التوقيت
+String formatArabicTime(dynamic timestamp) {
   if (timestamp == null) return 'الآن';
   try {
-    final date = DateTime.parse(timestamp).toLocal();
+    final date = DateTime.parse(timestamp.toString()).toLocal();
     final diff = DateTime.now().difference(date);
     if (diff.inSeconds < 60) return 'منذ لحظات';
     if (diff.inMinutes < 60) return 'منذ ${diff.inMinutes} دقيقة';
@@ -48,6 +49,13 @@ String formatArabicTime(String? timestamp) {
   } catch (_) {
     return 'مؤخراً';
   }
+}
+
+// دالة لمنع أي خطأ عند قراءة الحرف الأول
+String getFirstChar(dynamic text, [String fallback = 'أ']) {
+  if (text == null) return fallback;
+  final str = text.toString().trim();
+  return str.isNotEmpty ? str[0] : fallback;
 }
 
 class AtheerApp extends StatelessWidget {
@@ -245,9 +253,12 @@ class _AuthScreenState extends State<AuthScreen> {
                           backgroundColor: const Color(0xFF1F293D),
                           backgroundImage: _avatarPath != null ? FileImage(File(_avatarPath!)) : null,
                           child: _avatarPath == null
-                              ? const Column(
+                              ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [Icon(Icons.camera_alt, color: Color(0xFF8B5CF6), size: 24), Text('صورتك', style: TextStyle(fontSize: 10, color: Colors.white70))],
+                                  children: const [
+                                    Icon(Icons.camera_alt, color: Color(0xFF8B5CF6), size: 24),
+                                    Text('صورتك', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                                  ],
                                 )
                               : null,
                         ),
@@ -267,7 +278,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               dropdownColor: const Color(0xFF1A2338),
                               style: const TextStyle(color: Colors.white, fontSize: 13),
                               decoration: _inputDecor('الدولة', Icons.flag_outlined),
-                              items: locationsData.keys.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                              items: locationsData.keys.map<DropdownMenuItem<String>>((c) => DropdownMenuItem<String>(value: c, child: Text(c))).toList(),
                               onChanged: (val) {
                                 if (val != null) {
                                   setState(() {
@@ -285,7 +296,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               dropdownColor: const Color(0xFF1A2338),
                               style: const TextStyle(color: Colors.white, fontSize: 13),
                               decoration: _inputDecor('المدينة', Icons.location_city_outlined),
-                              items: locationsData[_selectedCountry]!.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                              items: (locationsData[_selectedCountry] ?? ['عام']).map<DropdownMenuItem<String>>((c) => DropdownMenuItem<String>(value: c, child: Text(c))).toList(),
                               onChanged: (val) {
                                 if (val != null) setState(() => _selectedCity = val);
                               },
@@ -356,7 +367,7 @@ class _AuthScreenState extends State<AuthScreen> {
 }
 
 // ==========================================
-// 2. الهيكل الرئيسي المطور مع الدردشات
+// 2. الهيكل الرئيسي المطور
 // ==========================================
 class FacebookStyleMain extends StatefulWidget {
   const FacebookStyleMain({super.key});
@@ -449,7 +460,6 @@ class _FeedScreenState extends State<FeedScreen> {
     });
   }
 
-  // إضافة ستوري جديدة
   void _addStory() async {
     final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
     final textCtrl = TextEditingController();
@@ -491,7 +501,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // عرض القصة بملء الشاشة
   void _viewStory(Map<String, dynamic> story) {
     showDialog(
       context: context,
@@ -506,7 +515,7 @@ class _FeedScreenState extends State<FeedScreen> {
             children: [
               Row(
                 children: [
-                  CircleAvatar(radius: 18, backgroundImage: story['avatar_url'] != '' ? FileImage(File(story['avatar_url'])) : null, child: Text((story['author_name'] ?? 'أ')[0])),
+                  CircleAvatar(radius: 18, backgroundImage: (story['avatar_url'] ?? '').isNotEmpty ? FileImage(File(story['avatar_url'])) : null, child: Text(getFirstChar(story['author_name']))),
                   const SizedBox(width: 8),
                   Text(story['author_name'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   const Spacer(),
@@ -514,8 +523,8 @@ class _FeedScreenState extends State<FeedScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              if (story['image_url'] != '') ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(story['image_url']), maxHeight: 300, fit: BoxFit.cover)),
-              if (story['text'] != '') Padding(padding: const EdgeInsets.only(top: 12), child: Text(story['text'], style: const TextStyle(color: Colors.white, fontSize: 16))),
+              if ((story['image_url'] ?? '').isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(story['image_url']), maxHeight: 300, fit: BoxFit.cover)),
+              if ((story['text'] ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(story['text'], style: const TextStyle(color: Colors.white, fontSize: 16))),
             ],
           ),
         ),
@@ -523,7 +532,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // نافذة المعاينة بالضغط المطول مع نسخ وتفاصيل
   void _showPostPreviewModal(Map<String, dynamic> post) {
     showDialog(
       context: context,
@@ -546,7 +554,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(child: Text((post['author_name'] ?? 'م')[0])),
+                      CircleAvatar(child: Text(getFirstChar(post['author_name']))),
                       const SizedBox(width: 10),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -608,7 +616,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // التفاعلات العائمة بالضغط المطول على الإعجاب
   void _showReactionsOverlay(BuildContext targetContext, Map<String, dynamic> post) {
     showDialog(
       context: context,
@@ -622,13 +629,13 @@ class _FeedScreenState extends State<FeedScreen> {
               color: Colors.transparent,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(color: const Color(0xFF1F293D), borderRadius: BorderRadius.circular(30), boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10)]),
+                decoration: BoxDecoration(color: const Color(0xFF1F293D), borderRadius: BorderRadius.circular(30)),
                 child: Row(
                   children: [
-                    _reactionItem('👍', 'like', post, ctx),
-                    _reactionItem('❤️', 'love', post, ctx),
-                    _reactionItem('😨', 'scare', post, ctx),
-                    _reactionItem('😡', 'angry', post, ctx),
+                    _reactionItem('👍', post, ctx),
+                    _reactionItem('❤️', post, ctx),
+                    _reactionItem('😨', post, ctx),
+                    _reactionItem('😡', post, ctx),
                   ],
                 ),
               ),
@@ -639,7 +646,7 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _reactionItem(String emoji, String key, Map<String, dynamic> post, BuildContext ctx) {
+  Widget _reactionItem(String emoji, Map<String, dynamic> post, BuildContext ctx) {
     return GestureDetector(
       onTap: () async {
         Navigator.pop(ctx);
@@ -654,7 +661,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // قائمة خيارات المنشور (حذف / تعديل / خصوصية)
   void _showPostMenu(Map<String, dynamic> post) {
     final myId = supabase.auth.currentUser?.id;
     final bool isOwner = post['user_id'] == myId;
@@ -744,7 +750,7 @@ class _FeedScreenState extends State<FeedScreen> {
               onRefresh: _loadAll,
               child: ListView(
                 children: [
-                  // 1. شريط الحالات / القصص
+                  // شريط الحالات / القصص
                   Container(
                     height: 104,
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -782,7 +788,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                       child: CircleAvatar(
                                         radius: 26,
                                         backgroundImage: (st['avatar_url'] ?? '').isNotEmpty ? FileImage(File(st['avatar_url'])) : null,
-                                        child: (st['avatar_url'] ?? '').isEmpty ? Text((st['author_name'] ?? 'أ')[0]) : null,
+                                        child: (st['avatar_url'] ?? '').isEmpty ? Text(getFirstChar(st['author_name'])) : null,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -797,7 +803,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
                   const Divider(height: 1),
 
-                  // 2. شريط النشر
+                  // شريط النشر
                   Container(
                     margin: const EdgeInsets.all(12),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -807,7 +813,7 @@ class _FeedScreenState extends State<FeedScreen> {
                         CircleAvatar(
                           radius: 18,
                           backgroundImage: (_myProfile?['avatar_url'] ?? '').isNotEmpty ? FileImage(File(_myProfile!['avatar_url'])) : null,
-                          child: (_myProfile?['avatar_url'] ?? '').isEmpty ? Text((_myProfile?['name'] ?? 'أ')[0]) : null,
+                          child: (_myProfile?['avatar_url'] ?? '').isEmpty ? Text(getFirstChar(_myProfile?['name'])) : null,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -824,7 +830,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
 
-                  // 3. المنشورات
+                  // قائمة المنشورات
                   ..._posts.map((post) {
                     final bool isFounder = post['is_founder'] == true;
                     return GestureDetector(
@@ -836,7 +842,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             ListTile(
-                              leading: CircleAvatar(child: Text((post['author_name'] ?? 'م')[0])),
+                              leading: CircleAvatar(child: Text(getFirstChar(post['author_name']))),
                               title: Row(
                                 children: [
                                   Text(post['author_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -882,14 +888,26 @@ class _FeedScreenState extends State<FeedScreen> {
                                   ),
                                   InkWell(
                                     onTap: () => _openComments(post['id']),
-                                    child: const Row(children: [Icon(Icons.comment_rounded, size: 16, color: Colors.grey), SizedBox(width: 6), Text('تعليق', style: TextStyle(fontSize: 12, color: Colors.grey))]),
+                                    child: Row(
+                                      children: const [
+                                        Icon(Icons.comment_rounded, size: 16, color: Colors.grey),
+                                        SizedBox(width: 6),
+                                        Text('تعليق', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                      ],
+                                    ),
                                   ),
                                   InkWell(
                                     onTap: () {
                                       Clipboard.setData(ClipboardData(text: '${post['author_name']}:\n${post['text']}\n\nنشر عبر تطبيق أثير 🌌'));
                                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ نص المنشور لمشاركته!')));
                                     },
-                                    child: const Row(children: [Icon(Icons.share_rounded, size: 16, color: Colors.grey), SizedBox(width: 6), Text('مشاركة', style: TextStyle(fontSize: 12, color: Colors.grey))]),
+                                    child: Row(
+                                      children: const [
+                                        Icon(Icons.share_rounded, size: 16, color: Colors.grey),
+                                        SizedBox(width: 6),
+                                        Text('مشاركة', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -927,10 +945,12 @@ class _FeedScreenState extends State<FeedScreen> {
                   DropdownButton<String>(
                     value: vis,
                     items: const [
-                      DropdownMenuItem(value: 'public', child: Text('عام 🌐')),
-                      DropdownMenuItem(value: 'friends', child: Text('للأصدقاء 👥')),
+                      DropdownMenuItem<String>(value: 'public', child: Text('عام 🌐')),
+                      DropdownMenuItem<String>(value: 'friends', child: Text('للأصدقاء 👥')),
                     ],
-                    onChanged: (v) => setM(() => vis = v!),
+                    onChanged: (v) {
+                      if (v != null) setM(() => vis = v);
+                    },
                   ),
                 ],
               ),
@@ -975,7 +995,7 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  void _openComments(String postId) {
+  void _openComments(dynamic postId) {
     final commentCtrl = TextEditingController();
     showModalBottomSheet(
       context: context,
@@ -990,7 +1010,7 @@ class _FeedScreenState extends State<FeedScreen> {
               const Divider(),
               Expanded(
                 child: FutureBuilder(
-                  future: supabase.from('comments').select().eq('post_id', postId).order('created_at', ascending: true),
+                  future: supabase.from('comments').select().eq('post_id', postId.toString()).order('created_at', ascending: true),
                   builder: (cx, AsyncSnapshot snap) {
                     if (!snap.hasData) return const Center(child: CircularProgressIndicator());
                     final list = snap.data as List;
@@ -1025,7 +1045,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       if (commentCtrl.text.trim().isNotEmpty) {
                         final u = supabase.auth.currentUser;
                         await supabase.from('comments').insert({
-                          'post_id': postId,
+                          'post_id': postId.toString(),
                           'user_id': u?.id,
                           'author_name': _myProfile?['name'] ?? 'مستخدم أثير',
                           'content': commentCtrl.text.trim(),
@@ -1046,7 +1066,7 @@ class _FeedScreenState extends State<FeedScreen> {
 }
 
 // ==========================================
-// 4. مركز العلاقات (المتابعة vs الأصدقاء والطلبات)
+// 4. مركز العلاقات (المتابعة vs الأصدقاء)
 // ==========================================
 class SocialHubScreen extends StatefulWidget {
   const SocialHubScreen({super.key});
@@ -1070,17 +1090,23 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
     _loadSocial();
   }
 
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSocial() async {
     setState(() => _loading = true);
     final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return;
 
-    final users = await supabase.from('profiles').select().neq('id', myId ?? '');
-    final follows = await supabase.from('follows').select('following_id').eq('follower_id', myId ?? '');
+    final users = await supabase.from('profiles').select().neq('id', myId);
+    final follows = await supabase.from('follows').select('following_id').eq('follower_id', myId);
 
-    // جلب الصداقات والطلبات
-    final reqs = await supabase.from('friendships').select().eq('receiver_id', myId ?? '').eq('status', 'pending');
-    final friends1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId ?? '').eq('status', 'accepted');
-    final friends2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId ?? '').eq('status', 'accepted');
+    final reqs = await supabase.from('friendships').select().eq('receiver_id', myId).eq('status', 'pending');
+    final friends1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId).eq('status', 'accepted');
+    final friends2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
 
     final friendSet = <String>{};
     for (var f in friends1) { friendSet.add(f['receiver_id'].toString()); }
@@ -1097,6 +1123,8 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
 
   Future<void> _toggleFollow(String id) async {
     final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return;
+
     if (_myFollowingIds.contains(id)) {
       await supabase.from('follows').delete().match({'follower_id': myId, 'following_id': id});
       setState(() => _myFollowingIds.remove(id));
@@ -1137,7 +1165,6 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
           : TabBarView(
               controller: _tabCtrl,
               children: [
-                // 1. استكشاف الجميع والمتابعة
                 ListView.builder(
                   itemCount: _allUsers.length,
                   itemBuilder: (ctx, i) {
@@ -1147,7 +1174,7 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
                     final bool isFriend = _myFriendIds.contains(uid);
 
                     return ListTile(
-                      leading: CircleAvatar(child: Text((u['name'] ?? 'م')[0])),
+                      leading: CircleAvatar(child: Text(getFirstChar(u['name']))),
                       title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('${u['location'] ?? ''} • ${u['work'] ?? ''}', maxLines: 1),
                       trailing: Row(
@@ -1167,8 +1194,6 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
                     );
                   },
                 ),
-
-                // 2. طلبات الصداقة الواردة
                 _friendRequests.isEmpty
                     ? const Center(child: Text('لا توجد طلبات صداقة معلقة'))
                     : ListView.builder(
@@ -1197,14 +1222,12 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
                           );
                         },
                       ),
-
-                // 3. قائمة الأصدقاء الحقيقيين
                 _myFriendIds.isEmpty
                     ? const Center(child: Text('لم تقم بإضافة أصدقاء بعد'))
                     : ListView(
                         children: _allUsers.where((u) => _myFriendIds.contains(u['id'])).map((u) {
                           return ListTile(
-                            leading: CircleAvatar(child: Text((u['name'] ?? 'ص')[0])),
+                            leading: CircleAvatar(child: Text(getFirstChar(u['name'], 'ص'))),
                             title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text(u['location'] ?? ''),
                             trailing: const Icon(Icons.check_circle, color: Colors.green),
@@ -1239,11 +1262,16 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
     _loadUsers();
   }
 
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadUsers() async {
     final myId = supabase.auth.currentUser?.id;
     final res = await supabase.from('profiles').select().neq('id', myId ?? '');
 
-    // تمييز الأصدقاء عن غير الأصدقاء لصندوق طلبات المراسلة
     final f1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId ?? '').eq('status', 'accepted');
     final f2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId ?? '').eq('status', 'accepted');
     final s = <String>{};
@@ -1290,7 +1318,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
       itemBuilder: (ctx, i) {
         final u = list[i];
         return ListTile(
-          leading: CircleAvatar(child: Text((u['name'] ?? 'م')[0])),
+          leading: CircleAvatar(child: Text(getFirstChar(u['name']))),
           title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(isRequest ? 'طلب محادثة من غير الأصدقاء' : (u['bio'] ?? '')),
           trailing: const Icon(Icons.arrow_forward_ios, size: 14),
@@ -1301,7 +1329,6 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
   }
 }
 
-// شاشة المحادثة الفردية الحقيقية مع حذف الـ 5 دقائق
 class SingleChatScreen extends StatefulWidget {
   final Map<String, dynamic> targetUser;
   const SingleChatScreen({super.key, required this.targetUser});
@@ -1324,6 +1351,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
   Future<void> _fetchMessages() async {
     final myId = supabase.auth.currentUser?.id;
     final otherId = widget.targetUser['id'];
+    if (myId == null) return;
 
     final res = await supabase.from('messages')
         .select()
@@ -1352,12 +1380,12 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
     _fetchMessages();
   }
 
-  // حذف الرسالة المقيد بشرط الـ 5 دقائق
   void _deleteMessageCheck(Map<String, dynamic> msg) async {
     final myId = supabase.auth.currentUser?.id;
     if (msg['sender_id'] != myId) return;
 
-    final createdAt = DateTime.parse(msg['created_at']).toLocal();
+    if (msg['created_at'] == null) return;
+    final createdAt = DateTime.parse(msg['created_at'].toString()).toLocal();
     final diff = DateTime.now().difference(createdAt);
 
     if (diff.inMinutes > 5) {
@@ -1395,7 +1423,7 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            CircleAvatar(radius: 18, child: Text((widget.targetUser['name'] ?? 'م')[0])),
+            CircleAvatar(radius: 18, child: Text(getFirstChar(widget.targetUser['name']))),
             const SizedBox(width: 10),
             Text(widget.targetUser['name'] ?? '', style: const TextStyle(fontSize: 16)),
           ],
@@ -1522,7 +1550,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               radius: 48,
               backgroundColor: const Color(0xFF7C3AED),
               backgroundImage: avatar.isNotEmpty ? FileImage(File(avatar)) : null,
-              child: avatar.isEmpty ? Text(name.isNotEmpty ? name[0] : 'أ', style: const TextStyle(fontSize: 42, color: Colors.white)) : null,
+              child: avatar.isEmpty ? Text(getFirstChar(name), style: const TextStyle(fontSize: 42, color: Colors.white)) : null,
             ),
           ),
           const SizedBox(height: 12),

@@ -1,5 +1,5 @@
 name: whatsapp_lite
-description: "A lightweight messaging app"
+description: "Atheer Social & Messaging Platform"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.2.2
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

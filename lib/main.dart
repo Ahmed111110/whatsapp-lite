@@ -117,7 +117,6 @@ Widget renderUniversalImage(dynamic source, {double? height, double? width, BoxF
   return imgWidget;
 }
 
-// ألوان فيسبوك الرسمية
 class FBColors {
   static const Color primaryBlue = Color(0xFF1877F2);
   static const Color lightBg = Color(0xFFF0F2F5);
@@ -194,7 +193,7 @@ class AuthGate extends StatelessWidget {
 }
 
 // ==========================================
-// 1. شاشة تسجيل الدخول وإنشاء الحساب
+// 1. شاشة التسجيل بهوية وشعار "أثير" الخاص
 // ==========================================
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -221,7 +220,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _pickAvatar() async {
-    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 40, maxWidth: 500);
+    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 35, maxWidth: 450);
     if (file != null) {
       final bytes = await File(file.path).readAsBytes();
       setState(() => _avatarBase64 = base64Encode(bytes));
@@ -305,17 +304,26 @@ class _AuthScreenState extends State<AuthScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 30),
           child: Column(
             children: [
+              // الشعار الخاص والفريد بتطبيق أثير 🌌
               Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
+                width: 82,
+                height: 82,
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: FBColors.primaryBlue,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1877F2), Color(0xFF00C6FF), Color(0xFF8A2BE2)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(color: const Color(0xFF1877F2).withOpacity(0.4), blurRadius: 20, spreadRadius: 2),
+                  ],
                 ),
-                child: const Icon(Icons.facebook, size: 54, color: Colors.white),
+                child: const Icon(Icons.blur_on_rounded, size: 52, color: Colors.white),
               ),
               const SizedBox(height: 12),
-              const Text('أَثِـيـر', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: FBColors.primaryBlue, letterSpacing: 1)),
-              const Text('فضاء التواصل الاجتماعي المتكامل', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const Text('أَثِـيـر', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: FBColors.primaryBlue, letterSpacing: 2)),
+              const Text('فضاء التواصل السحابي المضيء', style: TextStyle(color: Colors.white70, fontSize: 13)),
               const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(20),
@@ -392,7 +400,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             children: [
                               const Icon(Icons.cake_outlined, color: FBColors.primaryBlue, size: 20),
                               const SizedBox(width: 10),
-                              Text(_selectedBirthDate.isEmpty ? 'تاريخ الميلاد (روزنامة فيسبوك)' : _selectedBirthDate, style: TextStyle(color: _selectedBirthDate.isEmpty ? Colors.white38 : Colors.white, fontSize: 13)),
+                              Text(_selectedBirthDate.isEmpty ? 'تاريخ الميلاد (اختر من الروزنامة)' : _selectedBirthDate, style: TextStyle(color: _selectedBirthDate.isEmpty ? Colors.white38 : Colors.white, fontSize: 13)),
                             ],
                           ),
                         ),
@@ -403,7 +411,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       TextField(controller: _eduCtrl, style: const TextStyle(color: Colors.white), decoration: _fbInputDecor('التعليم والدراسة', Icons.school_outlined)),
                       const SizedBox(height: 10),
                     ],
-                    TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, style: const TextStyle(color: Colors.white), decoration: _fbInputDecor('البريد الإلكتروني أو الهاتف', Icons.email_outlined)),
+                    TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, style: const TextStyle(color: Colors.white), decoration: _fbInputDecor('البريد الإلكتروني', Icons.email_outlined)),
                     const SizedBox(height: 10),
                     TextField(controller: _passCtrl, obscureText: true, style: const TextStyle(color: Colors.white), decoration: _fbInputDecor('كلمة السر', Icons.lock_outline)),
                     const SizedBox(height: 18),
@@ -445,7 +453,7 @@ class _AuthScreenState extends State<AuthScreen> {
 }
 
 // =========================================================================
-// 2. الهيكل الرئيسي بنمط تبويبات فيسبوك
+// 2. الهيكل الرئيسي
 // =========================================================================
 class FacebookStyleMain extends StatefulWidget {
   const FacebookStyleMain({super.key});
@@ -489,7 +497,7 @@ class _FacebookStyleMainState extends State<FacebookStyleMain> {
             BottomNavigationBarItem(icon: Icon(Icons.home_filled, size: 26), label: 'الرئيسية'),
             BottomNavigationBarItem(icon: Icon(Icons.group, size: 26), label: 'المجتمع'),
             BottomNavigationBarItem(icon: Icon(Icons.chat_bubble, size: 24), label: 'الدردشات'),
-            BottomNavigationBarItem(icon: Icon(Icons.menu, size: 26), label: 'القائمة'),
+            BottomNavigationBarItem(icon: Icon(Icons.menu, size: 26), label: 'حسابي'),
           ],
         ),
       ),
@@ -498,7 +506,7 @@ class _FacebookStyleMainState extends State<FacebookStyleMain> {
 }
 
 // =========================================================================
-// 3. خلاصة المنشورات بنمط Facebook Feed بالكامل
+// 3. خلاصة المنشورات مع الكاش أوفلاين + إصلاح الإعجاب والمعاينة
 // =========================================================================
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -520,30 +528,64 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void initState() {
     super.initState();
+    _loadFromCacheFirst();
     _loadAll();
   }
 
-  Future<void> _loadAll() async {
-    setState(() => _loading = true);
-    final user = supabase.auth.currentUser;
-    if (user != null) {
-      final p = await supabase.from('profiles').select().eq('id', user.id).maybeSingle();
-      if (p != null) _myProfile = p;
-    }
-    final postsRes = await supabase.from('posts').select().order('created_at', ascending: false);
-    final storiesRes = await supabase.from('stories').select().order('created_at', ascending: false);
+  // تحميل الكاش المحلي أوفلاين فوراً قبل أي اتصال
+  Future<void> _loadFromCacheFirst() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedPosts = prefs.getString('atheer_cached_posts');
+    final cachedStories = prefs.getString('atheer_cached_stories');
+    final cachedProfile = prefs.getString('atheer_cached_profile');
 
-    if (mounted) {
+    if (cachedPosts != null && mounted) {
       setState(() {
-        _posts = List<Map<String, dynamic>>.from(postsRes);
-        _stories = List<Map<String, dynamic>>.from(storiesRes);
+        _posts = List<Map<String, dynamic>>.from(jsonDecode(cachedPosts));
         _loading = false;
       });
+    }
+    if (cachedStories != null && mounted) {
+      setState(() => _stories = List<Map<String, dynamic>>.from(jsonDecode(cachedStories)));
+    }
+    if (cachedProfile != null && mounted) {
+      setState(() => _myProfile = jsonDecode(cachedProfile));
+    }
+  }
+
+  Future<void> _loadAll() async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        final p = await supabase.from('profiles').select().eq('id', user.id).maybeSingle();
+        if (p != null) {
+          _myProfile = p;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('atheer_cached_profile', jsonEncode(p));
+        }
+      }
+      final postsRes = await supabase.from('posts').select().order('created_at', ascending: false);
+      final storiesRes = await supabase.from('stories').select().order('created_at', ascending: false);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('atheer_cached_posts', jsonEncode(postsRes));
+      await prefs.setString('atheer_cached_stories', jsonEncode(storiesRes));
+
+      if (mounted) {
+        setState(() {
+          _posts = List<Map<String, dynamic>>.from(postsRes);
+          _stories = List<Map<String, dynamic>>.from(storiesRes);
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      // في حال انقطاع النت يبقى الكاش كما هو بدون توقف
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   void _addStory() async {
-    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 40, maxWidth: 800);
+    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 35, maxWidth: 650);
     final textCtrl = TextEditingController();
     String? b64;
     if (file != null) {
@@ -596,26 +638,165 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Future<void> _handleReaction(Map<String, dynamic> post, String reactionType) async {
+  // =========================================================================
+  // نظام الإعجاب المنطقي الصحيح (Toggle Like) - نقرة واحدة لكل مستخدم
+  // =========================================================================
+  Future<void> _toggleLike(Map<String, dynamic> post) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return;
+
     Map<String, dynamic> reactions = {};
     if (post['reactions'] is Map) {
       reactions = Map<String, dynamic>.from(post['reactions']);
-    } else {
-      reactions = {'like': 0, 'love': 0, 'scare': 0, 'angry': 0};
     }
 
-    reactions[reactionType] = (reactions[reactionType] ?? 0) + 1;
-    final int totalLikes = (post['likes_count'] ?? 0) + 1;
+    List likedUsers = (reactions['liked_users'] is List) ? List.from(reactions['liked_users']) : [];
+    int currentCount = post['likes_count'] ?? 0;
 
-    await supabase.from('posts').update({
-      'likes_count': totalLikes,
-      'reactions': reactions,
-    }).eq('id', post['id']);
+    final bool alreadyLiked = likedUsers.contains(myId);
 
-    _loadAll();
+    if (alreadyLiked) {
+      likedUsers.remove(myId);
+      currentCount = (currentCount > 0) ? currentCount - 1 : 0;
+    } else {
+      likedUsers.add(myId);
+      currentCount = currentCount + 1;
+    }
+
+    reactions['liked_users'] = likedUsers;
+
+    setState(() {
+      post['likes_count'] = currentCount;
+      post['reactions'] = reactions;
+    });
+
+    try {
+      await supabase.from('posts').update({
+        'likes_count': currentCount,
+        'reactions': reactions,
+      }).eq('id', post['id']);
+    } catch (_) {}
   }
 
-  // ملخص التفاعلات والأيقونات المتراكبة كما في فيسبوك
+  Future<void> _handleReaction(Map<String, dynamic> post, String reactionType) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return;
+
+    Map<String, dynamic> reactions = {};
+    if (post['reactions'] is Map) {
+      reactions = Map<String, dynamic>.from(post['reactions']);
+    }
+
+    List likedUsers = (reactions['liked_users'] is List) ? List.from(reactions['liked_users']) : [];
+    int totalLikes = post['likes_count'] ?? 0;
+
+    if (!likedUsers.contains(myId)) {
+      likedUsers.add(myId);
+      totalLikes += 1;
+    }
+
+    reactions['liked_users'] = likedUsers;
+    reactions[reactionType] = (reactions[reactionType] ?? 0) + 1;
+
+    setState(() {
+      post['likes_count'] = totalLikes;
+      post['reactions'] = reactions;
+    });
+
+    try {
+      await supabase.from('posts').update({
+        'likes_count': totalLikes,
+        'reactions': reactions,
+      }).eq('id', post['id']);
+    } catch (_) {}
+  }
+
+  // =========================================================================
+  // نافذة المعاينة المكبرة بالضغط المطول على المنشور
+  // =========================================================================
+  void _showPostPreviewModal(Map<String, dynamic> post) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.85),
+      builder: (ctx) => Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(18),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: FBColors.primaryBlue.withOpacity(0.5), width: 1.5),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundImage: getUniversalImageProvider(post['author_avatar']),
+                        child: (post['author_avatar'] == null || post['author_avatar'] == '') ? Text(getFirstChar(post['author_name'])) : null,
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(post['author_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text('${formatArabicTime(post['created_at'])} • ${post['visibility'] == 'friends' ? 'للأصدقاء 👥' : 'عام 🌐'}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  if ((post['text'] ?? '').isNotEmpty)
+                    Text(post['text'] ?? '', style: const TextStyle(fontSize: 16, height: 1.45)),
+                  if ((post['image_url'] ?? '').isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: renderUniversalImage(post['image_url'], height: 220, width: double.infinity, borderRadius: BorderRadius.circular(12)),
+                    ),
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: FBColors.primaryBlue.withOpacity(0.15), elevation: 0),
+                          icon: const Icon(Icons.copy_rounded, color: FBColors.primaryBlue, size: 18),
+                          label: const Text('نسخ المنشور', style: TextStyle(color: FBColors.primaryBlue, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: post['text'] ?? ''));
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ نص المنشور بنجاح!')));
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.withOpacity(0.15), elevation: 0),
+                          icon: const Icon(Icons.share, color: Colors.grey, size: 18),
+                          label: const Text('مشاركة', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: '${post['author_name']}:\n${post['text']}\n\nنشر عبر أثير 🌌'));
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تجهيز الرابط للمشاركة!')));
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFBReactionsSummary(Map<String, dynamic> post) {
     final int count = post['likes_count'] ?? 0;
     if (count == 0) return const SizedBox.shrink();
@@ -624,7 +805,6 @@ class _FeedScreenState extends State<FeedScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         children: [
-          // أيقونات فيسبوك المتراكبة
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -695,7 +875,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // قائمة الثلاث نقاط (...) الخاصة بفيسبوك
   void _showPostMenu(Map<String, dynamic> post) {
     final myId = supabase.auth.currentUser?.id;
     final String? postUserId = post['user_id']?.toString();
@@ -719,7 +898,6 @@ class _FeedScreenState extends State<FeedScreen> {
               ListTile(
                 leading: const Icon(Icons.edit, color: FBColors.primaryBlue),
                 title: const Text('تعديل المنشور', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('تعديل النص وتحديثه في الخلاصة'),
                 onTap: () {
                   Navigator.pop(ctx);
                   final editCtrl = TextEditingController(text: post['text']);
@@ -756,26 +934,23 @@ class _FeedScreenState extends State<FeedScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
-                title: const Text('نقل إلى سلة المهملات (حذف)', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                title: const Text('حذف المنشور نهائياً', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await supabase.from('posts').delete().eq('id', post['id']);
                   _loadAll();
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف منشورك بنجاح')));
                 },
               ),
             ] else ...[
               ListTile(
                 leading: const Icon(Icons.bookmark_border_rounded, color: FBColors.primaryBlue),
                 title: Text(_savedPostIds.contains(post['id'].toString()) ? 'إلغاء حفظ المنشور' : 'حفظ المنشور 📌', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('إضافة هذا المنشور إلى عناصرك المحفوظة'),
                 onTap: () {
                   Navigator.pop(ctx);
                   final pid = post['id'].toString();
                   setState(() {
                     if (_savedPostIds.contains(pid)) {
                       _savedPostIds.remove(pid);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إزالة المنشور من المحفوظات')));
                     } else {
                       _savedPostIds.add(pid);
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ المنشور في محفوظاتك! 📌')));
@@ -786,29 +961,18 @@ class _FeedScreenState extends State<FeedScreen> {
               ListTile(
                 leading: const Icon(Icons.visibility_off_outlined, color: Colors.amber),
                 title: const Text('إخفاء المنشور 👁️', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('تقليل رؤية مثل هذه المنشورات'),
                 onTap: () {
                   Navigator.pop(ctx);
                   setState(() => _hiddenPostIds.add(post['id'].toString()));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إخفاء المنشور من خامتك')));
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.copy_rounded, color: Colors.grey),
-                title: const Text('نسخ الرابط / النص'),
+                title: const Text('نسخ نص المنشور'),
                 onTap: () {
                   Navigator.pop(ctx);
                   Clipboard.setData(ClipboardData(text: post['text'] ?? ''));
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ النص بنجاح!')));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.report_problem_outlined, color: Colors.redAccent),
-                title: const Text('الإبلاغ عن المنشور', style: TextStyle(color: Colors.redAccent)),
-                subtitle: const Text('يساورنا القلق بشأن هذا المنشور'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('شكراً لإبلاغنا، سنراجع هذا المنشور فوراً.')));
                 },
               ),
             ],
@@ -824,6 +988,7 @@ class _FeedScreenState extends State<FeedScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final visiblePosts = _posts.where((p) => !_hiddenPostIds.contains(p['id'].toString())).toList();
     final dividerBg = isDark ? FBColors.darkBg : FBColors.lightBg;
+    final myId = supabase.auth.currentUser?.id;
 
     return Scaffold(
       appBar: AppBar(
@@ -832,7 +997,6 @@ class _FeedScreenState extends State<FeedScreen> {
           _fbCircleIcon(Icons.search, () {}),
           const SizedBox(width: 8),
           _fbCircleIcon(Icons.chat_bubble_rounded, () {
-            // الانتقال لتبويب المحادثات
             final parent = context.findAncestorStateOfType<_FacebookStyleMainState>();
             if (parent != null) parent.setState(() => parent._tabIndex = 2);
           }),
@@ -845,9 +1009,6 @@ class _FeedScreenState extends State<FeedScreen> {
               onRefresh: _loadAll,
               child: ListView(
                 children: [
-                  // ==========================================
-                  // 1. مربع "بِمَ تفكر؟" (What's on your mind?)
-                  // ==========================================
                   Container(
                     color: Theme.of(context).cardColor,
                     padding: const EdgeInsets.only(top: 12, left: 14, right: 14, bottom: 8),
@@ -855,10 +1016,17 @@ class _FeedScreenState extends State<FeedScreen> {
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(
-                              radius: 20,
-                              backgroundImage: getUniversalImageProvider(_myProfile?['avatar_url']),
-                              child: (_myProfile?['avatar_url'] == null || _myProfile?['avatar_url'] == '') ? Text(getFirstChar(_myProfile?['name'])) : null,
+                            GestureDetector(
+                              onTap: () {
+                                if (_myProfile != null) {
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => FacebookUserProfileScreen(userId: _myProfile!['id'], initialProfile: _myProfile)));
+                                }
+                              },
+                              child: CircleAvatar(
+                                radius: 20,
+                                backgroundImage: getUniversalImageProvider(_myProfile?['avatar_url']),
+                                child: (_myProfile?['avatar_url'] == null || _myProfile?['avatar_url'] == '') ? Text(getFirstChar(_myProfile?['name'])) : null,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -879,7 +1047,6 @@ class _FeedScreenState extends State<FeedScreen> {
                         const SizedBox(height: 10),
                         const Divider(height: 1),
                         const SizedBox(height: 4),
-                        // الأزرار الثلاثة السفلية: بث مباشر - صورة - شعور
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
@@ -894,12 +1061,8 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
 
-                  // فاصل فيسبوك الرمادي العريض
                   Container(height: 8, color: dividerBg),
 
-                  // ==========================================
-                  // 2. شريط القصص (Facebook Stories Tray)
-                  // ==========================================
                   Container(
                     color: Theme.of(context).cardColor,
                     height: 195,
@@ -908,155 +1071,176 @@ class _FeedScreenState extends State<FeedScreen> {
                       scrollDirection: Axis.horizontal,
                       children: [
                         const SizedBox(width: 10),
-                        // كارت "إنشاء قصة" بتصميم فيسبوك المقسوم
                         _buildCreateStoryCard(isDark),
-                        // كروت قصص الأصدقاء
                         ..._stories.map((st) => _buildStoryCard(st, isDark)),
                         const SizedBox(width: 10),
                       ],
                     ),
                   ),
 
-                  // فاصل فيسبوك الرمادي العريض
                   Container(height: 8, color: dividerBg),
 
-                  // ==========================================
-                  // 3. خلاصة المنشورات (News Feed)
-                  // ==========================================
+                  // قائمة المنشورات مع التفاعل الصحيح والمعاينة بالضغط المطول
                   ...visiblePosts.map((post) {
                     final bool isFounder = post['is_founder'] == true;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      color: Theme.of(context).cardColor,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // رأس المنشور (Header)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 12, right: 12, top: 10, bottom: 6),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundImage: getUniversalImageProvider(post['author_avatar']),
-                                  child: (post['author_avatar'] == null || post['author_avatar'] == '') ? Text(getFirstChar(post['author_name'])) : null,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(post['author_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                                          if (isFounder) ...[
-                                            const SizedBox(width: 4),
-                                            const Icon(Icons.verified, color: FBColors.primaryBlue, size: 16),
-                                          ],
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Row(
-                                        children: [
-                                          Text(formatArabicTime(post['created_at']), style: TextStyle(fontSize: 12, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
-                                          const Text(' • ', style: TextStyle(color: Colors.grey)),
-                                          Icon(post['visibility'] == 'friends' ? Icons.group : Icons.public, size: 13, color: isDark ? FBColors.darkSubText : FBColors.lightSubText),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.more_horiz, color: Colors.grey),
-                                  onPressed: () => _showPostMenu(post),
-                                ),
-                              ],
-                            ),
-                          ),
+                    final Map reactions = (post['reactions'] is Map) ? post['reactions'] : {};
+                    final List likedUsers = (reactions['liked_users'] is List) ? reactions['liked_users'] : [];
+                    final bool isLikedByMe = (myId != null && likedUsers.contains(myId));
 
-                          // نص المنشور
-                          if ((post['text'] ?? '').isNotEmpty)
+                    return GestureDetector(
+                      onLongPress: () => _showPostPreviewModal(post),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        color: Theme.of(context).cardColor,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                              child: Text(post['text'] ?? '', style: const TextStyle(fontSize: 15, height: 1.35)),
-                            ),
-
-                          // صورة المنشور عريضة Edge-to-Edge
-                          if ((post['image_url'] ?? '').isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: renderUniversalImage(post['image_url'], width: double.infinity, fit: BoxFit.cover),
-                            ),
-
-                          // شريط عدد التفاعلات والتعليقات
-                          _buildFBReactionsSummary(post),
-
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Divider(height: 1),
-                          ),
-
-                          // أزرار فيسبوك الثلاثة: أعجبني - تعليق - مشاركة
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: InkWell(
-                                    onLongPress: () => _showReactionsOverlay(post),
-                                    onTap: () => _handleReaction(post, 'like'),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.thumb_up_alt_outlined, size: 18, color: isDark ? FBColors.darkSubText : FBColors.lightSubText),
-                                          const SizedBox(width: 6),
-                                          Text('أعجبني', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () => _openComments(post['id']),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.chat_bubble_outline, size: 18, color: isDark ? FBColors.darkSubText : FBColors.lightSubText),
-                                          const SizedBox(width: 6),
-                                          Text('تعليق', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: InkWell(
+                              padding: const EdgeInsets.only(left: 12, right: 12, top: 10, bottom: 6),
+                              child: Row(
+                                children: [
+                                  // النقر على الصورة ينقل لصفحة الكاتب
+                                  GestureDetector(
                                     onTap: () {
-                                      Clipboard.setData(ClipboardData(text: '${post['author_name']}:\n${post['text']}\n\nنشر عبر تطبيق أثير 🌌'));
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ رابط المنشور!')));
+                                      Navigator.push(context, MaterialPageRoute(builder: (_) => FacebookUserProfileScreen(userId: post['user_id'] ?? '', fallbackName: post['author_name'], fallbackAvatar: post['author_avatar'])));
                                     },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 8),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.share_outlined, size: 18, color: isDark ? FBColors.darkSubText : FBColors.lightSubText),
-                                          const SizedBox(width: 6),
-                                          Text('مشاركة', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
-                                        ],
+                                    child: CircleAvatar(
+                                      radius: 20,
+                                      backgroundImage: getUniversalImageProvider(post['author_avatar']),
+                                      child: (post['author_avatar'] == null || post['author_avatar'] == '') ? Text(getFirstChar(post['author_name'])) : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // النقر على الاسم ينقل لصفحة الكاتب
+                                        GestureDetector(
+                                          onTap: () {
+                                            Navigator.push(context, MaterialPageRoute(builder: (_) => FacebookUserProfileScreen(userId: post['user_id'] ?? '', fallbackName: post['author_name'], fallbackAvatar: post['author_avatar'])));
+                                          },
+                                          child: Row(
+                                            children: [
+                                              Text(post['author_name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                              if (isFounder) ...[
+                                                const SizedBox(width: 4),
+                                                const Icon(Icons.verified, color: FBColors.primaryBlue, size: 16),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Text(formatArabicTime(post['created_at']), style: TextStyle(fontSize: 12, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
+                                            const Text(' • ', style: TextStyle(color: Colors.grey)),
+                                            Icon(post['visibility'] == 'friends' ? Icons.group : Icons.public, size: 13, color: isDark ? FBColors.darkSubText : FBColors.lightSubText),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.more_horiz, color: Colors.grey),
+                                    onPressed: () => _showPostMenu(post),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            if ((post['text'] ?? '').isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                                child: Text(post['text'] ?? '', style: const TextStyle(fontSize: 15, height: 1.35)),
+                              ),
+
+                            if ((post['image_url'] ?? '').isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: renderUniversalImage(post['image_url'], width: double.infinity, fit: BoxFit.cover),
+                              ),
+
+                            _buildFBReactionsSummary(post),
+
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Divider(height: 1),
+                            ),
+
+                            // شريط الأزرار التفاعلية
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      onLongPress: () => _showReactionsOverlay(post),
+                                      onTap: () => _toggleLike(post),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              isLikedByMe ? Icons.thumb_up : Icons.thumb_up_alt_outlined,
+                                              size: 18,
+                                              color: isLikedByMe ? FBColors.primaryBlue : (isDark ? FBColors.darkSubText : FBColors.lightSubText),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'أعجبني',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: isLikedByMe ? FBColors.primaryBlue : (isDark ? FBColors.darkSubText : FBColors.lightSubText),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () => _openComments(post['id']),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.chat_bubble_outline, size: 18, color: isDark ? FBColors.darkSubText : FBColors.lightSubText),
+                                            const SizedBox(width: 6),
+                                            Text('تعليق', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () {
+                                        Clipboard.setData(ClipboardData(text: '${post['author_name']}:\n${post['text']}\n\nنشر عبر تطبيق أثير 🌌'));
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ نص المنشور لمشاركته!')));
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.share_outlined, size: 18, color: isDark ? FBColors.darkSubText : FBColors.lightSubText),
+                                            const SizedBox(width: 6),
+                                            Text('مشاركة', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   }),
@@ -1066,7 +1250,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // أيقونة فيسبوك الدائرية الرمادية
   Widget _fbCircleIcon(IconData icon, VoidCallback onTap) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
@@ -1083,7 +1266,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // خيارات شريط بما تفكر
   Widget _fbQuickAction(IconData icon, Color color, String label, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -1097,7 +1279,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // كارت إنشاء القصة المقسوم
   Widget _buildCreateStoryCard(bool isDark) {
     return Container(
       width: 105,
@@ -1113,7 +1294,6 @@ class _FeedScreenState extends State<FeedScreen> {
         child: Stack(
           alignment: Alignment.topCenter,
           children: [
-            // النصف العلوي: صورة البروفايل
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: SizedBox(
@@ -1122,7 +1302,6 @@ class _FeedScreenState extends State<FeedScreen> {
                 child: renderUniversalImage(_myProfile?['avatar_url'], fit: BoxFit.cover),
               ),
             ),
-            // النصف السفلي: زر + أزرق ونص إنشاء قصة
             Positioned(
               bottom: 42,
               child: Container(
@@ -1145,7 +1324,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // كروت القصص الحقيقية
   Widget _buildStoryCard(Map<String, dynamic> st, bool isDark) {
     return GestureDetector(
       onTap: () => _viewStory(st),
@@ -1160,11 +1338,9 @@ class _FeedScreenState extends State<FeedScreen> {
           borderRadius: BorderRadius.circular(12),
           child: Stack(
             children: [
-              // صورة القصة كخلفية كاملة
               Positioned.fill(
                 child: renderUniversalImage(st['image_url'], fit: BoxFit.cover),
               ),
-              // تدرج داكن أسفل الكارت لإبراز النص
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
@@ -1176,7 +1352,6 @@ class _FeedScreenState extends State<FeedScreen> {
                   ),
                 ),
               ),
-              // صورة الحساب مع الإطار الأزرق في الزاوية
               Positioned(
                 top: 8,
                 right: 8,
@@ -1190,7 +1365,6 @@ class _FeedScreenState extends State<FeedScreen> {
                   ),
                 ),
               ),
-              // اسم صاحب القصة في الأسفل
               Positioned(
                 bottom: 8,
                 left: 8,
@@ -1261,7 +1435,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   IconButton(
                     icon: const Icon(Icons.photo_library, color: Color(0xFF45BD62)),
                     onPressed: () async {
-                      final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 40, maxWidth: 800);
+                      final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 35, maxWidth: 650);
                       if (f != null) {
                         final bytes = await File(f.path).readAsBytes();
                         setM(() => b64 = base64Encode(bytes));
@@ -1283,7 +1457,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           'image_url': b64 ?? '',
                           'visibility': vis,
                           'likes_count': 0,
-                          'reactions': {'like': 0, 'love': 0, 'scare': 0, 'angry': 0},
+                          'reactions': {'like': 0, 'love': 0, 'scare': 0, 'angry': 0, 'liked_users': []},
                         });
                         Navigator.pop(ctx);
                         _loadAll();
@@ -1379,7 +1553,7 @@ class _FeedScreenState extends State<FeedScreen> {
 }
 
 // =========================================================================
-// عارض الستوري السينمائي بتفاعلات فيسبوك
+// عارض الستوري السينمائي
 // =========================================================================
 class StoryViewerDialog extends StatefulWidget {
   final Map<String, dynamic> story;
@@ -1584,25 +1758,29 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return;
 
-    final users = await supabase.from('profiles').select().neq('id', myId);
-    final follows = await supabase.from('follows').select('following_id').eq('follower_id', myId);
+    try {
+      final users = await supabase.from('profiles').select().neq('id', myId);
+      final follows = await supabase.from('follows').select('following_id').eq('follower_id', myId);
 
-    final reqs = await supabase.from('friendships').select().eq('receiver_id', myId).eq('status', 'pending');
-    final friends1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId).eq('status', 'accepted');
-    final friends2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
+      final reqs = await supabase.from('friendships').select().eq('receiver_id', myId).eq('status', 'pending');
+      final friends1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId).eq('status', 'accepted');
+      final friends2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
 
-    final friendSet = <String>{};
-    for (var f in friends1) { friendSet.add(f['receiver_id'].toString()); }
-    for (var f in friends2) { friendSet.add(f['sender_id'].toString()); }
+      final friendSet = <String>{};
+      for (var f in friends1) { friendSet.add(f['receiver_id'].toString()); }
+      for (var f in friends2) { friendSet.add(f['sender_id'].toString()); }
 
-    if (mounted) {
-      setState(() {
-        _allUsers = List<Map<String, dynamic>>.from(users);
-        _friendRequests = List<Map<String, dynamic>>.from(reqs);
-        _myFollowingIds = (follows as List).map((e) => e['following_id'].toString()).toSet();
-        _myFriendIds = friendSet;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allUsers = List<Map<String, dynamic>>.from(users);
+          _friendRequests = List<Map<String, dynamic>>.from(reqs);
+          _myFollowingIds = (follows as List).map((e) => e['following_id'].toString()).toSet();
+          _myFriendIds = friendSet;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -1659,11 +1837,17 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
                     final bool isFriend = _myFriendIds.contains(uid);
 
                     return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: getUniversalImageProvider(u['avatar_url']),
-                        child: (u['avatar_url'] == null || u['avatar_url'] == '') ? Text(getFirstChar(u['name'])) : null,
+                      leading: GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacebookUserProfileScreen(userId: uid, initialProfile: u))),
+                        child: CircleAvatar(
+                          backgroundImage: getUniversalImageProvider(u['avatar_url']),
+                          child: (u['avatar_url'] == null || u['avatar_url'] == '') ? Text(getFirstChar(u['name'])) : null,
+                        ),
                       ),
-                      title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacebookUserProfileScreen(userId: uid, initialProfile: u))),
+                        child: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ),
                       subtitle: Text('${u['location'] ?? ''} • ${u['work'] ?? ''}', maxLines: 1),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1715,9 +1899,12 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
                     : ListView(
                         children: _allUsers.where((u) => _myFriendIds.contains(u['id'])).map((u) {
                           return ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: getUniversalImageProvider(u['avatar_url']),
-                              child: (u['avatar_url'] == null || u['avatar_url'] == '') ? Text(getFirstChar(u['name'], 'ص')) : null,
+                            leading: GestureDetector(
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacebookUserProfileScreen(userId: u['id'], initialProfile: u))),
+                              child: CircleAvatar(
+                                backgroundImage: getUniversalImageProvider(u['avatar_url']),
+                                child: (u['avatar_url'] == null || u['avatar_url'] == '') ? Text(getFirstChar(u['name'], 'ص')) : null,
+                              ),
                             ),
                             title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text(u['location'] ?? ''),
@@ -1732,7 +1919,7 @@ class _SocialHubScreenState extends State<SocialHubScreen> with SingleTickerProv
 }
 
 // =========================================================================
-// 5. محادثات Messenger
+// 5. محادثات Messenger مع الكاش أوفلاين
 // =========================================================================
 class ChatsListScreen extends StatefulWidget {
   const ChatsListScreen({super.key});
@@ -1750,6 +1937,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    _loadFromCache();
     _loadUsers();
   }
 
@@ -1759,22 +1947,36 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
     super.dispose();
   }
 
+  Future<void> _loadFromCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('atheer_cached_chat_users');
+    if (cached != null && mounted) {
+      setState(() => _users = List<Map<String, dynamic>>.from(jsonDecode(cached)));
+    }
+  }
+
   Future<void> _loadUsers() async {
     final myId = supabase.auth.currentUser?.id;
-    final res = await supabase.from('profiles').select().neq('id', myId ?? '');
+    if (myId == null) return;
 
-    final f1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId ?? '').eq('status', 'accepted');
-    final f2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId ?? '').eq('status', 'accepted');
-    final s = <String>{};
-    for (var f in f1) { s.add(f['receiver_id'].toString()); }
-    for (var f in f2) { s.add(f['sender_id'].toString()); }
+    try {
+      final res = await supabase.from('profiles').select().neq('id', myId);
+      final f1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId).eq('status', 'accepted');
+      final f2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
+      final s = <String>{};
+      for (var f in f1) { s.add(f['receiver_id'].toString()); }
+      for (var f in f2) { s.add(f['sender_id'].toString()); }
 
-    if (mounted) {
-      setState(() {
-        _users = List<Map<String, dynamic>>.from(res);
-        _friendIds = s;
-      });
-    }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('atheer_cached_chat_users', jsonEncode(res));
+
+      if (mounted) {
+        setState(() {
+          _users = List<Map<String, dynamic>>.from(res);
+          _friendIds = s;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -1865,6 +2067,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
       }
     });
 
+    _loadCachedMessages();
     _fetchMessages();
     _pollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) => _fetchMessages(silent: true));
   }
@@ -1875,6 +2078,17 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCachedMessages() async {
+    final myId = supabase.auth.currentUser?.id;
+    final otherId = widget.targetUser['id'];
+    if (myId == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('atheer_chat_${myId}_$otherId');
+    if (cached != null && mounted) {
+      setState(() => _messages = List<Map<String, dynamic>>.from(jsonDecode(cached)));
+    }
   }
 
   Future<void> _fetchMessages({bool silent = false}) async {
@@ -1889,6 +2103,9 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
           .order('created_at', ascending: true);
 
       final newMsgs = List<Map<String, dynamic>>.from(res);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('atheer_chat_${myId}_$otherId', jsonEncode(newMsgs));
+
       if (newMsgs.length != _messages.length || !silent) {
         if (mounted) {
           setState(() => _messages = newMsgs);
@@ -1931,48 +2148,12 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
   }
 
   void _pickAndSendImage() async {
-    final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 40, maxWidth: 800);
+    final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 35, maxWidth: 650);
     if (f != null) {
       final bytes = await File(f.path).readAsBytes();
       final b64 = base64Encode(bytes);
       _sendMessage(imageBase64: b64, customText: '📷 صورة');
     }
-  }
-
-  void _deleteMessageCheck(Map<String, dynamic> msg) async {
-    final myId = supabase.auth.currentUser?.id;
-    if (msg['sender_id'] != myId) return;
-
-    if (msg['created_at'] == null) return;
-    final createdAt = DateTime.parse(msg['created_at'].toString()).toLocal();
-    final diff = DateTime.now().difference(createdAt);
-
-    if (diff.inMinutes > 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('عذراً! لا يمكن حذف الرسالة لدى الجميع بعد مرور 5 دقائق على إرسالها.'), backgroundColor: Colors.redAccent),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف لدى الجميع 🚫'),
-        content: const Text('هل تريد حذف هذه الرسالة من المحادثة لدى الطرفين؟'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () async {
-              await supabase.from('messages').update({'is_deleted': true, 'content': 'تم حذف هذه الرسالة 🚫', 'image_url': ''}).eq('id', msg['id']);
-              Navigator.pop(ctx);
-              _fetchMessages();
-            },
-            child: const Text('حذف الآن', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -1983,40 +2164,26 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: Row(
-          children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundImage: getUniversalImageProvider(widget.targetUser['avatar_url']),
-                  child: (widget.targetUser['avatar_url'] == null || widget.targetUser['avatar_url'] == '') ? Text(getFirstChar(widget.targetUser['name'])) : null,
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(color: const Color(0xFF31A24C), shape: BoxShape.circle, border: Border.all(color: Theme.of(context).cardColor, width: 2)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.targetUser['name'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                const Text('نشط الآن 🟢', style: TextStyle(fontSize: 10, color: Color(0xFF31A24C))),
-              ],
-            ),
-          ],
+        title: GestureDetector(
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacebookUserProfileScreen(userId: widget.targetUser['id'], initialProfile: widget.targetUser))),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 19,
+                backgroundImage: getUniversalImageProvider(widget.targetUser['avatar_url']),
+                child: (widget.targetUser['avatar_url'] == null || widget.targetUser['avatar_url'] == '') ? Text(getFirstChar(widget.targetUser['name'])) : null,
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.targetUser['name'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const Text('نشط الآن 🟢', style: TextStyle(fontSize: 10, color: Color(0xFF31A24C))),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.call, color: FBColors.primaryBlue), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.videocam, color: FBColors.primaryBlue), onPressed: () {}),
-        ],
       ),
       body: Column(
         children: [
@@ -2031,65 +2198,62 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
                 final bool isDeleted = m['is_deleted'] == true;
                 final hasImage = (m['image_url'] ?? '').isNotEmpty && !isDeleted;
 
-                return GestureDetector(
-                  onLongPress: () => _deleteMessageCheck(m),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (!isMe) ...[
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundImage: getUniversalImageProvider(widget.targetUser['avatar_url']),
-                            child: (widget.targetUser['avatar_url'] == null || widget.targetUser['avatar_url'] == '') ? Text(getFirstChar(widget.targetUser['name']), style: const TextStyle(fontSize: 10)) : null,
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (!isMe) ...[
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundImage: getUniversalImageProvider(widget.targetUser['avatar_url']),
+                          child: (widget.targetUser['avatar_url'] == null || widget.targetUser['avatar_url'] == '') ? Text(getFirstChar(widget.targetUser['name']), style: const TextStyle(fontSize: 10)) : null,
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Flexible(
+                        child: Container(
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isDeleted
+                                ? Colors.grey.withOpacity(0.2)
+                                : (isMe ? FBColors.primaryBlue : (isDark ? const Color(0xFF3E4042) : const Color(0xFFE4E6EB))),
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(18),
+                              topRight: const Radius.circular(18),
+                              bottomLeft: Radius.circular(isMe ? 18 : 4),
+                              bottomRight: Radius.circular(isMe ? 4 : 18),
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                        ],
-                        Flexible(
-                          child: Container(
-                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isDeleted
-                                  ? Colors.grey.withOpacity(0.2)
-                                  : (isMe ? FBColors.primaryBlue : (isDark ? const Color(0xFF3E4042) : const Color(0xFFE4E6EB))),
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(18),
-                                topRight: const Radius.circular(18),
-                                bottomLeft: Radius.circular(isMe ? 18 : 4),
-                                bottomRight: Radius.circular(isMe ? 4 : 18),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                              children: [
-                                if (hasImage)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 6),
-                                    child: renderUniversalImage(m['image_url'], height: 180, width: double.infinity, borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                if ((m['content'] ?? '').isNotEmpty)
-                                  Text(
-                                    m['content'] ?? '',
-                                    style: TextStyle(
-                                      color: isMe ? Colors.white : (isDark ? Colors.white : const Color(0xFF050505)),
-                                      fontSize: 14.5,
-                                      fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,
-                                    ),
-                                  ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  formatArabicTime(m['created_at']),
-                                  style: TextStyle(fontSize: 9, color: isMe ? Colors.white70 : Colors.grey),
+                          child: Column(
+                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              if (hasImage)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: renderUniversalImage(m['image_url'], height: 180, width: double.infinity, borderRadius: BorderRadius.circular(12)),
                                 ),
-                              ],
-                            ),
+                              if ((m['content'] ?? '').isNotEmpty)
+                                Text(
+                                  m['content'] ?? '',
+                                  style: TextStyle(
+                                    color: isMe ? Colors.white : (isDark ? Colors.white : const Color(0xFF050505)),
+                                    fontSize: 14.5,
+                                    fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal,
+                                  ),
+                                ),
+                              const SizedBox(height: 3),
+                              Text(
+                                formatArabicTime(m['created_at']),
+                                style: TextStyle(fontSize: 9, color: isMe ? Colors.white70 : Colors.grey),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -2149,122 +2313,279 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
   }
 }
 
-// ==========================================
-// 6. شاشة الملف الشخصي
-// ==========================================
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+// =========================================================================
+// 6. الصفحة الشخصية الكاملة المطابقة لفيسبوك (لأي مستخدم أو للمستخدم الحالي)
+// =========================================================================
+class FacebookUserProfileScreen extends StatefulWidget {
+  final String userId;
+  final String? fallbackName;
+  final String? fallbackAvatar;
+  final Map<String, dynamic>? initialProfile;
+
+  const FacebookUserProfileScreen({
+    super.key,
+    required this.userId,
+    this.fallbackName,
+    this.fallbackAvatar,
+    this.initialProfile,
+  });
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<FacebookUserProfileScreen> createState() => _FacebookUserProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _FacebookUserProfileScreenState extends State<FacebookUserProfileScreen> {
   Map<String, dynamic>? _profile;
+  List<Map<String, dynamic>> _userPosts = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    if (widget.initialProfile != null) {
+      _profile = widget.initialProfile;
+      _loading = false;
+    }
+    _loadUserProfile();
   }
 
-  Future<void> _loadProfile() async {
-    setState(() => _loading = true);
-    final user = supabase.auth.currentUser;
-    if (user != null) {
-      final res = await supabase.from('profiles').select().eq('id', user.id).maybeSingle();
-      setState(() {
-        _profile = res;
-        _loading = false;
-      });
+  Future<void> _loadUserProfile() async {
+    try {
+      final p = await supabase.from('profiles').select().eq('id', widget.userId).maybeSingle();
+      final postsRes = await supabase.from('posts').select().eq('user_id', widget.userId).order('created_at', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          if (p != null) _profile = p;
+          _userPosts = List<Map<String, dynamic>>.from(postsRes);
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator(color: FBColors.primaryBlue)));
+    final myId = supabase.auth.currentUser?.id;
+    final bool isMyProfile = (myId != null && myId == widget.userId);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final name = _profile?['name'] ?? 'مستخدم أثير';
+    final name = _profile?['name'] ?? widget.fallbackName ?? 'مستخدم أثير';
     final bio = _profile?['bio'] ?? '';
+    final avatar = _profile?['avatar_url'] ?? widget.fallbackAvatar ?? '';
     final isFounder = _profile?['is_founder'] == true;
     final location = _profile?['location'] ?? '';
     final work = _profile?['work'] ?? '';
     final edu = _profile?['education'] ?? '';
     final birth = _profile?['birth_date'] ?? '';
-    final avatar = _profile?['avatar_url'] ?? '';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('الملف الشخصي'),
+        title: Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: FBColors.primaryBlue, size: 26),
-            tooltip: 'إعدادات فيسبوك والخصوصية',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => FacebookSettingsHub(currentProfile: _profile ?? {})),
-              );
-              _loadProfile();
-            },
-          ),
+          if (isMyProfile)
+            IconButton(
+              icon: const Icon(Icons.settings, color: FBColors.primaryBlue),
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => FacebookSettingsHub(currentProfile: _profile ?? {})));
+                _loadUserProfile();
+              },
+            ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Center(
-            child: CircleAvatar(
-              radius: 54,
-              backgroundColor: FBColors.primaryBlue,
-              backgroundImage: getUniversalImageProvider(avatar),
-              child: (avatar.isEmpty) ? Text(getFirstChar(name), style: const TextStyle(fontSize: 44, color: Colors.white)) : null,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              if (isFounder) ...[
-                const SizedBox(width: 6),
-                const Icon(Icons.verified, color: FBColors.primaryBlue, size: 22),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: FBColors.primaryBlue))
+          : ListView(
+              children: [
+                // غلاف فيسبوك العريض + الصورة الشخصية المتداخلة
+                Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    Container(
+                      height: 160,
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF0052D4), Color(0xFF4364F7), Color(0xFF6FB1FC)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -45,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, shape: BoxShape.circle),
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundColor: FBColors.primaryBlue,
+                          backgroundImage: getUniversalImageProvider(avatar),
+                          child: (avatar.isEmpty) ? Text(getFirstChar(name), style: const TextStyle(fontSize: 42, color: Colors.white)) : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 52),
+
+                // الاسم والشارة والنبذة
+                Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                      if (isFounder) ...[
+                        const SizedBox(width: 6),
+                        const Icon(Icons.verified, color: FBColors.primaryBlue, size: 22),
+                      ],
+                    ],
+                  ),
+                ),
+                if (bio.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Text(bio, textAlign: TextAlign.center, style: TextStyle(color: isDark ? FBColors.darkSubText : FBColors.lightSubText, fontSize: 13.5)),
+                  ),
+
+                const SizedBox(height: 12),
+
+                // أزرار فيسبوك التفاعلية
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      if (isMyProfile) ...[
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: FBColors.primaryBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                            icon: const Icon(Icons.add, color: Colors.white, size: 18),
+                            label: const Text('إضافة إلى القصة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            onPressed: () {},
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: isDark ? FBColors.darkInput : FBColors.lightInput, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                            icon: Icon(Icons.edit, color: isDark ? Colors.white : Colors.black, size: 18),
+                            label: Text('تعديل الملف', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+                            onPressed: () async {
+                              await Navigator.push(context, MaterialPageRoute(builder: (_) => FullEditProfileScreen(currentProfile: _profile ?? {})));
+                              _loadUserProfile();
+                            },
+                          ),
+                        ),
+                      ] else ...[
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: FBColors.primaryBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                            icon: const Icon(Icons.person_add, color: Colors.white, size: 18),
+                            label: const Text('إضافة صديق', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              supabase.from('friendships').insert({'sender_id': myId, 'receiver_id': widget.userId, 'status': 'pending'});
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة!')));
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: isDark ? FBColors.darkInput : FBColors.lightInput, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                            icon: const Icon(Icons.chat_bubble, color: FBColors.primaryBlue, size: 18),
+                            label: Text('مراسلة', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => MessengerChatScreen(targetUser: _profile ?? {'id': widget.userId, 'name': name, 'avatar_url': avatar})));
+                            },
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+                const Divider(),
+
+                // قسم تفاصيل الحساب (About details)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('التفاصيل 📌', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      if (work.isNotEmpty) _fbDetailItem(Icons.work, 'يعمل لدى: $work'),
+                      if (edu.isNotEmpty) _fbDetailItem(Icons.school, 'درس في: $edu'),
+                      if (location.isNotEmpty) _fbDetailItem(Icons.home, 'يقيم في: $location'),
+                      if (birth.isNotEmpty) _fbDetailItem(Icons.cake, 'تاريخ الميلاد: $birth'),
+                    ],
+                  ),
+                ),
+
+                const Divider(),
+
+                // عنوان المنشورات
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: Text('منشورات $name', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+
+                if (_userPosts.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: Text('لا توجد منشورات لهذا المستخدم بعد.')),
+                  )
+                else
+                  ..._userPosts.map((post) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      color: Theme.of(context).cardColor,
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(radius: 18, backgroundImage: getUniversalImageProvider(avatar)),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  Text(formatArabicTime(post['created_at']), style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if ((post['text'] ?? '').isNotEmpty) Text(post['text']),
+                          if ((post['image_url'] ?? '').isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: renderUniversalImage(post['image_url'], height: 200, width: double.infinity, borderRadius: BorderRadius.circular(10)),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
               ],
-            ],
-          ),
-          const SizedBox(height: 4),
-          Center(child: Text(bio, textAlign: TextAlign.center, style: const TextStyle(color: FBColors.primaryBlue))),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: FBColors.primaryBlue.withOpacity(0.12),
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            icon: const Icon(Icons.settings_suggest, color: FBColors.primaryBlue, size: 20),
-            label: const Text('الإعدادات والخصوصية (مركز حسابات فيسبوك)', style: TextStyle(color: FBColors.primaryBlue, fontWeight: FontWeight.bold)),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => FacebookSettingsHub(currentProfile: _profile ?? {})),
-              );
-              _loadProfile();
-            },
-          ),
-          const SizedBox(height: 20),
-          const Divider(),
-          if (location.isNotEmpty) ListTile(leading: const Icon(Icons.location_on, color: FBColors.primaryBlue), title: const Text('الموقع الجغرافي والسكن'), subtitle: Text(location)),
-          if (work.isNotEmpty) ListTile(leading: const Icon(Icons.work, color: FBColors.primaryBlue), title: const Text('العمل'), subtitle: Text(work)),
-          if (edu.isNotEmpty) ListTile(leading: const Icon(Icons.school, color: FBColors.primaryBlue), title: const Text('التعليم والدراسة'), subtitle: Text(edu)),
-          if (birth.isNotEmpty) ListTile(leading: const Icon(Icons.cake, color: FBColors.primaryBlue), title: const Text('تاريخ الميلاد'), subtitle: Text(birth)),
-          const SizedBox(height: 28),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.withOpacity(0.15), elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12)),
-            icon: const Icon(Icons.logout, color: Colors.redAccent),
-            label: const Text('تسجيل الخروج من الحساب', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-            onPressed: () async => await supabase.auth.signOut(),
-          ),
+    );
+  }
+
+  Widget _fbDetailItem(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, color: FBColors.primaryBlue, size: 20),
+          const SizedBox(width: 10),
+          Text(text, style: const TextStyle(fontSize: 14)),
         ],
       ),
     );
@@ -2272,7 +2593,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 // ==========================================
-// 7. مركز الإعدادات بنمط فيسبوك
+// 7. شاشة الملف الشخصي الحالية
+// ==========================================
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final myId = supabase.auth.currentUser?.id ?? '';
+    return FacebookUserProfileScreen(userId: myId);
+  }
+}
+
+// ==========================================
+// 8. مركز الإعدادات بنمط فيسبوك
 // ==========================================
 class FacebookSettingsHub extends StatefulWidget {
   final Map<String, dynamic> currentProfile;
@@ -2516,9 +2850,9 @@ class _FacebookSettingsHubState extends State<FacebookSettingsHub> {
   }
 }
 
-// ==========================================
-// 8. شاشة تعديل الملف الشخصي الشاملة
-// ==========================================
+// =========================================================================
+// 9. شاشة تعديل الملف مع التحديث الشامل في كل الجداول والكاش
+// =========================================================================
 class FullEditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> currentProfile;
   const FullEditProfileScreen({super.key, required this.currentProfile});
@@ -2554,7 +2888,7 @@ class _FullEditProfileScreenState extends State<FullEditProfileScreen> {
   }
 
   Future<void> _pickNewAvatar() async {
-    final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 40, maxWidth: 500);
+    final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 35, maxWidth: 450);
     if (f != null) {
       final bytes = await File(f.path).readAsBytes();
       setState(() => _newAvatarBase64 = base64Encode(bytes));
@@ -2573,26 +2907,41 @@ class _FullEditProfileScreenState extends State<FullEditProfileScreen> {
     }
   }
 
+  // حفظ وتحديث الصورة والبيانات في جدول الحساب وجدول المنشورات والكاش معاً!
   Future<void> _saveProfileSettings() async {
     final uid = supabase.auth.currentUser?.id;
     if (uid == null) return;
 
     setState(() => _saving = true);
+    final updatedData = {
+      'id': uid,
+      'name': _nameCtrl.text.trim(),
+      'bio': _bioCtrl.text.trim(),
+      'work': _workCtrl.text.trim(),
+      'education': _eduCtrl.text.trim(),
+      'country': _country,
+      'city': _city,
+      'location': '$_country، $_city',
+      'birth_date': _birthDate,
+      'avatar_url': _newAvatarBase64 ?? '',
+    };
+
     try {
-      await supabase.from('profiles').update({
-        'name': _nameCtrl.text.trim(),
-        'bio': _bioCtrl.text.trim(),
-        'work': _workCtrl.text.trim(),
-        'education': _eduCtrl.text.trim(),
-        'country': _country,
-        'city': _city,
-        'location': '$_country، $_city',
-        'birth_date': _birthDate,
-        'avatar_url': _newAvatarBase64 ?? '',
-      }).eq('id', uid);
+      // 1. تحديث البروفايل
+      await supabase.from('profiles').upsert(updatedData);
+
+      // 2. تحديث صورة واسم الكاتب في المنشورات السابقة حتى تظهر للجميع
+      await supabase.from('posts').update({
+        'author_name': _nameCtrl.text.trim(),
+        'author_avatar': _newAvatarBase64 ?? '',
+      }).eq('user_id', uid);
+
+      // 3. تحديث الكاش المحلي ليعمل التطبيق بها حتى بدون إنترنت
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('atheer_cached_profile', jsonEncode(updatedData));
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ وتحديث بياناتك وصورتك بنجاح! 🎉')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ صورتك وتحديث بياناتك في كامل السيرفر بنجاح! 🎉')));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -2690,7 +3039,7 @@ class _FullEditProfileScreenState extends State<FullEditProfileScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: FBColors.primaryBlue, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
                 onPressed: _saving ? null : _saveProfileSettings,
-                child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('حفظ التعديلات في السيرفر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                child: _saving ? const CircularProgressIndicator(color: Colors.white) : const Text('حفظ وتحديث في السيرفر', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
               ),
             ),
           ],

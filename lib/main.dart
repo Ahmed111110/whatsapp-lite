@@ -51,11 +51,23 @@ String formatArabicTime(dynamic timestamp) {
   }
 }
 
-// دالة لمنع أي خطأ عند قراءة الحرف الأول
 String getFirstChar(dynamic text, [String fallback = 'أ']) {
   if (text == null) return fallback;
   final str = text.toString().trim();
   return str.isNotEmpty ? str[0] : fallback;
+}
+
+// دالة آمنة لعرض الصور
+Widget safeImageWidget(dynamic path, {double? height, double? width, BoxFit fit = BoxFit.cover}) {
+  if (path == null) return const SizedBox.shrink();
+  final str = path.toString().trim();
+  if (str.isEmpty) return const SizedBox.shrink();
+  try {
+    final file = File(str);
+    return Image.file(file, height: height, width: width, fit: fit);
+  } catch (_) {
+    return const SizedBox.shrink();
+  }
 }
 
 class AtheerApp extends StatelessWidget {
@@ -474,7 +486,7 @@ class _FeedScreenState extends State<FeedScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (file != null) ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(file.path), height: 130, fit: BoxFit.cover)),
+            if (file != null) ClipRRect(borderRadius: BorderRadius.circular(12), child: safeImageWidget(file.path, height: 130, fit: BoxFit.cover)),
             const SizedBox(height: 10),
             TextField(controller: textCtrl, decoration: const InputDecoration(hintText: 'اكتب عبارة تظهر مع القصة...')),
           ],
@@ -523,7 +535,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              if ((story['image_url'] ?? '').isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(story['image_url']), maxHeight: 300, fit: BoxFit.cover)),
+              ClipRRect(borderRadius: BorderRadius.circular(16), child: safeImageWidget(story['image_url'], height: 300, fit: BoxFit.cover)),
               if ((story['text'] ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(story['text'], style: const TextStyle(color: Colors.white, fontSize: 16))),
             ],
           ),
@@ -567,11 +579,10 @@ class _FeedScreenState extends State<FeedScreen> {
                   ),
                   const SizedBox(height: 14),
                   Text(post['text'] ?? '', style: const TextStyle(fontSize: 15, height: 1.5)),
-                  if ((post['image_url'] ?? '').isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(post['image_url']), maxHeight: 220, width: double.infinity, fit: BoxFit.cover)),
-                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(12), child: safeImageWidget(post['image_url'], height: 220, width: double.infinity, fit: BoxFit.cover)),
+                  ),
                   const Divider(height: 24),
                   Row(
                     children: [
@@ -750,7 +761,6 @@ class _FeedScreenState extends State<FeedScreen> {
               onRefresh: _loadAll,
               child: ListView(
                 children: [
-                  // شريط الحالات / القصص
                   Container(
                     height: 104,
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -803,7 +813,6 @@ class _FeedScreenState extends State<FeedScreen> {
 
                   const Divider(height: 1),
 
-                  // شريط النشر
                   Container(
                     margin: const EdgeInsets.all(12),
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -830,7 +839,6 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                   ),
 
-                  // قائمة المنشورات
                   ..._posts.map((post) {
                     final bool isFounder = post['is_founder'] == true;
                     return GestureDetector(
@@ -860,11 +868,7 @@ class _FeedScreenState extends State<FeedScreen> {
                               trailing: IconButton(icon: const Icon(Icons.more_vert), onPressed: () => _showPostMenu(post)),
                             ),
                             Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), child: Text(post['text'] ?? '', style: const TextStyle(fontSize: 14, height: 1.4))),
-                            if ((post['image_url'] ?? '').isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Image.file(File(post['image_url']), maxHeight: 240, width: double.infinity, fit: BoxFit.cover),
-                              ),
+                            safeImageWidget(post['image_url'], height: 240, width: double.infinity, fit: BoxFit.cover),
                             const Divider(height: 16),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -955,7 +959,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 ],
               ),
               TextField(controller: textCtrl, maxLines: 4, decoration: const InputDecoration(hintText: 'اكتب أثرك هنا...', border: InputBorder.none)),
-              if (img != null) ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.file(File(img!), height: 140, fit: BoxFit.cover)),
+              if (img != null) ClipRRect(borderRadius: BorderRadius.circular(12), child: safeImageWidget(img, height: 140, fit: BoxFit.cover)),
               Row(
                 children: [
                   IconButton(
@@ -1454,8 +1458,8 @@ class _SingleChatScreenState extends State<SingleChatScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if ((m['image_url'] ?? '').isNotEmpty && !isDeleted)
-                            ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.file(File(m['image_url']), height: 150, fit: BoxFit.cover)),
+                          if (!isDeleted)
+                            ClipRRect(borderRadius: BorderRadius.circular(10), child: safeImageWidget(m['image_url'], height: 150, fit: BoxFit.cover)),
                           Text(m['content'] ?? '', style: TextStyle(color: Colors.white, fontStyle: isDeleted ? FontStyle.italic : FontStyle.normal)),
                           const SizedBox(height: 2),
                           Text(formatArabicTime(m['created_at']), style: const TextStyle(fontSize: 9, color: Colors.white54)),

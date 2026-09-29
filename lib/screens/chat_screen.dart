@@ -13,9 +13,9 @@ import 'profile_screen.dart';
 
 final supabase = Supabase.instance.client;
 
-// =========================================================================
-// شاشة قائمة المحادثات (Chats List Screen)
-// =========================================================================
+// ==========================================
+// 1. قائمة المحادثات (الأصدقاء وطلبات المراسلة)
+// ==========================================
 class ChatsListScreen extends StatefulWidget {
   const ChatsListScreen({super.key});
 
@@ -33,7 +33,6 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
-    _loadFromCache();
     _loadUsers();
   }
 
@@ -43,32 +42,21 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
     super.dispose();
   }
 
-  Future<void> _loadFromCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString('atheer_cached_chat_users');
-    if (cached != null && mounted) {
-      setState(() {
-        _users = List<Map<String, dynamic>>.from(jsonDecode(cached));
-        _loading = false;
-      });
-    }
-  }
-
   Future<void> _loadUsers() async {
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return;
-
     try {
       final res = await supabase.from('profiles').select().neq('id', myId);
       final f1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId).eq('status', 'accepted');
       final f2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
       
       final s = <String>{};
-      for (var f in f1) { s.add(f['receiver_id'].toString()); }
-      for (var f in f2) { s.add(f['sender_id'].toString()); }
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('atheer_cached_chat_users', jsonEncode(res));
+      for (var f in f1) {
+        s.add(f['receiver_id'].toString());
+      }
+      for (var f in f2) {
+        s.add(f['sender_id'].toString());
+      }
 
       if (mounted) {
         setState(() {
@@ -85,7 +73,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final friendsList = _users.where((u) => _friendIds.contains(u['id'])).toList();
-    final nonFriendsList = _users.where((u) => !_friendIds.contains(u['id'])).toList();
+    final reqsList = _users.where((u) => !_friendIds.contains(u['id'])).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -94,84 +82,56 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
           controller: _tabCtrl,
           indicatorColor: FBColors.primaryBlue,
           tabs: [
-            Tab(text: 'الأصدقاء (${friendsList.length})'),
-            Tab(text: 'طلبات المراسلة (${nonFriendsList.length})'),
+            Tab(text: "الأصدقاء (${friendsList.length})"),
+            Tab(text: "طلبات المراسلة (${reqsList.length})"),
           ],
         ),
       ),
-      body: _loading && _users.isEmpty
+      body: _loading
           ? const Center(child: CircularProgressIndicator(color: FBColors.primaryBlue))
           : TabBarView(
               controller: _tabCtrl,
               children: [
-                _chatUserList(friendsList, false),
-                _chatUserList(nonFriendsList, true),
+                _buildList(friendsList, false),
+                _buildList(reqsList, true),
               ],
             ),
     );
   }
 
-  Widget _chatUserList(List<Map<String, dynamic>> list, bool isRequest) {
+  Widget _buildList(List<Map<String, dynamic>> list, bool isRequest) {
     if (list.isEmpty) {
       return Center(
         child: Text(
-          isRequest ? 'لا توجد طلبات مراسلة حالياً' : 'ابدأ محادثة جديدة مع أحد أصدقائك',
+          isRequest ? 'لا توجد طلبات مراسلة' : 'ابدأ محادثة مع أصدقائك',
           style: const TextStyle(color: Colors.grey),
         ),
       );
     }
-
     return ListView.builder(
       itemCount: list.length,
       itemBuilder: (ctx, i) {
         final u = list[i];
         return ListTile(
-          leading: Stack(
-            children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundImage: getUniversalImageProvider(u['avatar_url']),
-                child: (u['avatar_url'] == null || u['avatar_url'] == '')
-                    ? Text(getFirstChar(u['name']), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18))
-                    : null,
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF31A24C),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Theme.of(context).cardColor, width: 2.5),
-                  ),
-                ),
-              ),
-            ],
+          leading: CircleAvatar(
+            backgroundImage: getUniversalImageProvider(u['avatar_url']),
+            child: (u['avatar_url'] == null || u['avatar_url'] == '') ? Text(getFirstChar(u['name'])) : null,
           ),
-          title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          subtitle: Text(
-            isRequest ? 'طلب محادثة من غير الأصدقاء' : (u['bio'] ?? 'انقر لفتح المحادثة المباشرة'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(isRequest ? 'طلب محادثة' : (u['bio'] ?? 'انقر لفتح المحادثة'), maxLines: 1),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ChatScreen(targetUser: u)),
           ),
-          trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => ChatScreen(targetUser: u)),
-            );
-          },
         );
       },
     );
   }
 }
 
-// =========================================================================
-// شاشة المحادثة المتقدمة
-// =========================================================================
+// ==========================================
+// 2. شاشة المحادثة المتقدمة
+// ==========================================
 class ChatScreen extends StatefulWidget {
   final dynamic targetUser;
   const ChatScreen({super.key, required this.targetUser});
@@ -185,142 +145,103 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollCtrl = ScrollController();
   final ImagePicker _picker = ImagePicker();
   List<Map<String, dynamic>> _messages = [];
-  Timer? _pollingTimer;
+  Timer? _timer;
   bool _isTyping = false;
   bool _targetIsTyping = false;
   bool _uploadingImage = false;
 
-  String get _targetUserId => widget.targetUser['id']?.toString() ?? '';
-  String get _targetUserName => widget.targetUser['name']?.toString() ?? 'مستخدم أثير';
-  String get _targetUserAvatar => widget.targetUser['avatar_url']?.toString() ?? '';
+  String get _tId => widget.targetUser['id']?.toString() ?? '';
+  String get _tName => widget.targetUser['name']?.toString() ?? 'مستخدم أثير';
+  String get _tAvatar => widget.targetUser['avatar_url']?.toString() ?? '';
 
   @override
   void initState() {
     super.initState();
-    _msgCtrl.addListener(_onTextChanged);
-    _loadCachedMessages();
+    _msgCtrl.addListener(_onTypingChanged);
     _fetchMessages();
-    _updateMyPresence();
-    _pollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+    _timer = Timer.periodic(const Duration(milliseconds: 1600), (_) {
       _fetchMessages(silent: true);
-      _checkTargetTypingAndOnline();
+      _checkStatus();
     });
   }
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
-    _clearTypingStatus();
+    _timer?.cancel();
+    _setTyping(false);
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
-  void _onTextChanged() {
-    final hasText = _msgCtrl.text.trim().isNotEmpty;
-    if (hasText != _isTyping) {
-      setState(() => _isTyping = hasText);
-      _setTypingStatus(hasText);
+  void _onTypingChanged() {
+    final has = _msgCtrl.text.trim().isNotEmpty;
+    if (has != _isTyping) {
+      setState(() => _isTyping = has);
+      _setTyping(has);
     }
   }
 
-  Future<void> _setTypingStatus(bool typing) async {
+  Future<void> _setTyping(bool typing) async {
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return;
     try {
       await supabase.from('profiles').update({
-        'typing_to': typing ? _targetUserId : null,
+        'typing_to': typing ? _tId : null,
         'last_seen': DateTime.now().toIso8601String(),
       }).eq('id', myId);
     } catch (_) {}
   }
 
-  Future<void> _clearTypingStatus() async {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
+  Future<void> _checkStatus() async {
+    if (_tId.isEmpty) return;
     try {
-      await supabase.from('profiles').update({'typing_to': null}).eq('id', myId);
-    } catch (_) {}
-  }
-
-  Future<void> _updateMyPresence() async {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
-    try {
-      await supabase.from('profiles').update({'last_seen': DateTime.now().toIso8601String()}).eq('id', myId);
-    } catch (_) {}
-  }
-
-  Future<void> _checkTargetTypingAndOnline() async {
-    if (_targetUserId.isEmpty) return;
-    try {
-      final target = await supabase.from('profiles').select('typing_to, last_seen').eq('id', _targetUserId).maybeSingle();
-      if (target != null && mounted) {
+      final t = await supabase.from('profiles').select('typing_to').eq('id', _tId).maybeSingle();
+      if (t != null && mounted) {
         final myId = supabase.auth.currentUser?.id;
-        final bool isTypingToMe = target['typing_to'] == myId;
-        if (isTypingToMe != _targetIsTyping) {
-          setState(() => _targetIsTyping = isTypingToMe);
-        }
+        final bool typing = t['typing_to'] == myId;
+        if (typing != _targetIsTyping) setState(() => _targetIsTyping = typing);
       }
     } catch (_) {}
-  }
-
-  Future<void> _loadCachedMessages() async {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null || _targetUserId.isEmpty) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString('atheer_chat_${myId}_$_targetUserId');
-    if (cached != null && mounted) {
-      setState(() => _messages = List<Map<String, dynamic>>.from(jsonDecode(cached)));
-      _scrollToBottom();
-    }
   }
 
   Future<void> _fetchMessages({bool silent = false}) async {
     final myId = supabase.auth.currentUser?.id;
-    if (myId == null || _targetUserId.isEmpty) return;
-
+    if (myId == null || _tId.isEmpty) return;
     try {
-      final res = await supabase.from('messages')
+      final res = await supabase
+          .from('messages')
           .select()
-          .or('and(sender_id.eq.$myId,receiver_id.eq.$_targetUserId),and(sender_id.eq.$_targetUserId,receiver_id.eq.$myId)')
+          .or('and(sender_id.eq.$myId,receiver_id.eq.$_tId),and(sender_id.eq.$_tId,receiver_id.eq.$myId)')
           .order('created_at', ascending: true);
 
-      final List<Map<String, dynamic>> rawMsgs = List<Map<String, dynamic>>.from(res);
-
-      final filteredMsgs = rawMsgs.where((m) {
+      final List<Map<String, dynamic>> raw = List<Map<String, dynamic>>.from(res);
+      final filtered = raw.where((m) {
         final isMe = m['sender_id'] == myId;
-        if (isMe && (m['deleted_by_sender'] == true)) return false;
-        if (!isMe && (m['deleted_by_receiver'] == true)) return false;
+        if (isMe && m['deleted_by_sender'] == true) return false;
+        if (!isMe && m['deleted_by_receiver'] == true) return false;
         return true;
       }).toList();
 
-      final unreadIds = rawMsgs
-          .where((m) => m['sender_id'] == _targetUserId && m['receiver_id'] == myId && m['is_read'] != true)
+      final unread = raw
+          .where((m) => m['sender_id'] == _tId && m['receiver_id'] == myId && m['is_read'] != true)
           .map((m) => m['id'])
           .toList();
 
-      if (unreadIds.isNotEmpty) {
-        await supabase.from('messages').update({
-          'is_read': true,
-          'is_delivered': true,
-        }).filter('id', 'in', unreadIds);
+      if (unread.isNotEmpty) {
+        await supabase.from('messages').update({'is_read': true, 'is_delivered': true}).filter('id', 'in', unread);
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('atheer_chat_${myId}_$_targetUserId', jsonEncode(filteredMsgs));
-
-      if (filteredMsgs.length != _messages.length || !silent) {
+      if (filtered.length != _messages.length || !silent) {
         if (mounted) {
-          setState(() => _messages = filteredMsgs);
-          _scrollToBottom();
+          setState(() => _messages = filtered);
+          _scrollToEnd();
         }
       }
     } catch (_) {}
   }
 
-  void _scrollToBottom() {
+  void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
@@ -332,124 +253,104 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _sendMessage({String? cloudImageUrl, String? customText, bool isForwarded = false, String? directReceiverId}) async {
-    final text = customText ?? _msgCtrl.text.trim();
-    if (text.isEmpty && cloudImageUrl == null) return;
-
+  Future<void> _send({String? imgUrl, String? text, bool forwarded = false, String? targetId}) async {
+    final content = text ?? _msgCtrl.text.trim();
+    if (content.isEmpty && imgUrl == null) return;
     final myId = supabase.auth.currentUser?.id;
-    final otherId = directReceiverId ?? _targetUserId;
-    if (myId == null || otherId.isEmpty) return;
+    final dest = targetId ?? _tId;
+    if (myId == null || dest.isEmpty) return;
 
-    if (directReceiverId == null) {
+    if (targetId == null) {
       _msgCtrl.clear();
-      _setTypingStatus(false);
+      _setTyping(false);
     }
 
     bool isOnline = false;
     try {
-      final target = await supabase.from('profiles').select('last_seen').eq('id', otherId).maybeSingle();
+      final target = await supabase.from('profiles').select('last_seen').eq('id', dest).maybeSingle();
       if (target != null && target['last_seen'] != null) {
-        final lastSeen = DateTime.parse(target['last_seen'].toString()).toLocal();
-        if (DateTime.now().difference(lastSeen).inMinutes < 3) {
-          isOnline = true;
-        }
+        final diff = DateTime.now().difference(DateTime.parse(target['last_seen'].toString()).toLocal()).inMinutes;
+        isOnline = diff < 3;
       }
     } catch (_) {}
 
     await supabase.from('messages').insert({
       'sender_id': myId,
-      'receiver_id': otherId,
-      'content': text,
-      'image_url': cloudImageUrl ?? '',
+      'receiver_id': dest,
+      'content': content,
+      'image_url': imgUrl ?? '',
       'is_deleted': false,
-      'is_forwarded': isForwarded,
+      'is_forwarded': forwarded,
       'is_delivered': isOnline,
       'is_read': false,
       'reaction': '',
     });
 
-    if (directReceiverId == null) {
-      _fetchMessages();
-    }
+    if (targetId == null) _fetchMessages();
   }
 
-  void _pickAndSendImage() async {
+  Future<void> _pickImage() async {
     final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 65, maxWidth: 900);
     if (f == null) return;
-
     setState(() => _uploadingImage = true);
-    final cloudUrl = await StorageService.uploadImage(file: File(f.path), folder: 'chats');
+    final url = await StorageService.uploadImage(file: File(f.path), folder: 'chats');
     setState(() => _uploadingImage = false);
-
-    if (cloudUrl != null) {
-      _sendMessage(cloudImageUrl: cloudUrl, customText: '📷 صورة');
-    }
+    if (url != null) _send(imgUrl: url, text: '📷 صورة');
   }
 
-  void _showMessageOptions(Map<String, dynamic> msg) {
+  void _showMsgMenu(Map<String, dynamic> msg) {
     final myId = supabase.auth.currentUser?.id;
     final bool isMe = msg['sender_id'] == myId;
-    final bool isDeleted = msg['is_deleted'] == true;
+    final bool isDel = msg['is_deleted'] == true;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).cardColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!isDeleted)
+            if (!isDel)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _emojiReactionBtn('👍', msg),
-                    _emojiReactionBtn('❤️', msg),
-                    _emojiReactionBtn('😂', msg),
-                    _emojiReactionBtn('😮', msg),
-                    _emojiReactionBtn('😢', msg),
-                    _emojiReactionBtn('😡', msg),
-                    _emojiReactionBtn('🔥', msg),
-                  ],
+                  children: ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥'].map((emoji) {
+                    return InkWell(
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        final cur = msg['reaction'] ?? '';
+                        await supabase.from('messages').update({'reaction': cur == emoji ? '' : emoji}).eq('id', msg['id']);
+                        _fetchMessages();
+                      },
+                      child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                    );
+                  }).toList(),
                 ),
               ),
-
             const Divider(height: 1),
-
-            if (!isDeleted)
+            if (!isDel)
               ListTile(
                 leading: const Icon(Icons.reply, color: FBColors.primaryBlue),
-                title: const Text('إعادة توجيه ↪️', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('إرسال هذه الرسالة إلى صديق آخر دون اسم المرسل'),
+                title: const Text('إعادة توجيه ↪️'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _openForwardDialog(msg);
+                  _forwardMsg(msg);
                 },
               ),
-
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.orange),
-              title: const Text('حذف لدي فقط', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('إخفاء الرسالة من جهازك فقط'),
+              title: const Text('حذف لدي فقط'),
               onTap: () async {
                 Navigator.pop(ctx);
-                if (isMe) {
-                  await supabase.from('messages').update({'deleted_by_sender': true}).eq('id', msg['id']);
-                } else {
-                  await supabase.from('messages').update({'deleted_by_receiver': true}).eq('id', msg['id']);
-                }
+                await supabase.from('messages').update({isMe ? 'deleted_by_sender' : 'deleted_by_receiver': true}).eq('id', msg['id']);
                 _fetchMessages();
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الرسالة لديك بنجاح')));
               },
             ),
-
-            if (isMe && !isDeleted)
+            if (isMe && !isDel)
               ListTile(
                 leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
-                title: const Text('حذف لدى الجميع 🚫', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                subtitle: const Text('حذف الرسالة من عند الطرفين نهائياً'),
+                title: const Text('حذف لدى الجميع 🚫', style: TextStyle(color: Colors.redAccent)),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await supabase.from('messages').update({
@@ -459,93 +360,211 @@ class _ChatScreenState extends State<ChatScreen> {
                     'reaction': '',
                   }).eq('id', msg['id']);
                   _fetchMessages();
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الرسالة لدى الجميع!')));
                 },
               ),
-
-            if (!isDeleted && (msg['content'] ?? '').isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.copy, color: Colors.grey),
-                title: const Text('نسخ نص الرسالة'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  Clipboard.setData(ClipboardData(text: msg['content'] ?? ''));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ النص!')));
-                },
-              ),
-            const SizedBox(height: 6),
           ],
         ),
       ),
     );
   }
 
-  Widget _emojiReactionBtn(String emoji, Map<String, dynamic> msg) {
-    return InkWell(
-      onTap: () async {
-        Navigator.pop(context);
-        final currentReaction = msg['reaction'] ?? '';
-        final newReaction = (currentReaction == emoji) ? '' : emoji;
-        await supabase.from('messages').update({'reaction': newReaction}).eq('id', msg['id']);
-        _fetchMessages();
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.all(6),
-        child: Text(emoji, style: const TextStyle(fontSize: 26)),
-      ),
-    );
-  }
-
-  Future<void> _openForwardDialog(Map<String, dynamic> msg) async {
+  Future<void> _forwardMsg(Map<String, dynamic> msg) async {
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return;
-
     final f1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId).eq('status', 'accepted');
     final f2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
-    final friendIds = <String>{};
-    for (var f in f1) { friendIds.add(f['receiver_id'].toString()); }
-    for (var f in f2) { friendIds.add(f['sender_id'].toString()); }
+    final ids = <String>{};
+    for (var f in f1) {
+      ids.add(f['receiver_id'].toString());
+    }
+    for (var f in f2) {
+      ids.add(f['sender_id'].toString());
+    }
 
-    if (friendIds.isEmpty) {
+    if (ids.isEmpty) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ليس لديك أصدقاء بعد لإعادة التوجيه لهم!')));
       return;
     }
 
-    final friendsProfiles = await supabase.from('profiles').select().filter('id', 'in', friendIds.toList());
-
+    final friends = await supabase.from('profiles').select().filter('id', 'in', ids.toList());
     if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('إعادة توجيه الرسالة إلى... ↪️', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => ListView.builder(
+        itemCount: friends.length,
+        itemBuilder: (c, i) {
+          final fr = friends[i];
+          return ListTile(
+            leading: CircleAvatar(backgroundImage: getUniversalImageProvider(fr['avatar_url'])),
+            title: Text(fr['name'] ?? ''),
+            trailing: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: FBColors.primaryBlue),
+              child: const Text('إرسال', style: TextStyle(color: Colors.white)),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _send(text: msg['content'], imgUrl: msg['image_url'], forwarded: true, targetId: fr['id']);
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إعادة التوجيه بنجاح!')));
+              },
             ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                itemCount: friendsProfiles.length,
-                itemBuilder: (c, i) {
-                  final friend = friendsProfiles[i];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage: getUniversalImageProvider(friend['avatar_url']),
-                      child: (friend['avatar_url'] == null || friend['avatar_url'] == '') ? Text(getFirstChar(friend['name'])) : null,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTicks(Map<String, dynamic> m) {
+    if (m['is_read'] == true) {
+      return const Icon(Icons.done_all, size: 14, color: Color(0xFF31A24C));
+    } else if (m['is_delivered'] == true) {
+      return const Icon(Icons.done_all, size: 14, color: Colors.grey);
+    }
+    return const Icon(Icons.done, size: 14, color: Colors.grey);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final myId = supabase.auth.currentUser?.id;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            CircleAvatar(radius: 18, backgroundImage: getUniversalImageProvider(_tAvatar)),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_tName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                Text(_targetIsTyping ? 'جاري الكتابة... ✍️' : 'نشط الآن 🟢', style: const TextStyle(fontSize: 11, color: Color(0xFF31A24C))),
+              ],
+            ),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollCtrl,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              itemCount: _messages.length,
+              itemBuilder: (ctx, i) {
+                final m = _messages[i];
+                final isMe = m['sender_id'] == myId;
+                final isDel = m['is_deleted'] == true;
+                final String reaction = m['reaction'] ?? '';
+
+                return GestureDetector(
+                  onLongPress: () => _showMsgMenu(m),
+                  child: Align(
+                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                          decoration: BoxDecoration(
+                            color: isDel
+                                ? Colors.grey.withOpacity(0.2)
+                                : (isMe ? FBColors.primaryBlue : (isDark ? const Color(0xFF3E4042) : const Color(0xFFE4E6EB))),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                            children: [
+                              if ((m['image_url'] ?? '').isNotEmpty && !isDel)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: renderUniversalImage(m['image_url'], height: 160, width: double.infinity, borderRadius: BorderRadius.circular(8)),
+                                ),
+                              if ((m['content'] ?? '').isNotEmpty)
+                                Text(
+                                  m['content'] ?? '',
+                                  style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black), fontSize: 14),
+                                ),
+                              if (m['is_forwarded'] == true && !isDel)
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 2),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.reply, size: 10, color: Colors.grey),
+                                      SizedBox(width: 2),
+                                      Text('رسالة موجّهة', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                                    ],
+                                  ),
+                                ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(formatArabicTime(m['created_at']), style: TextStyle(fontSize: 8.5, color: isMe ? Colors.white70 : Colors.grey)),
+                                  if (isMe && !isDel) ...[const SizedBox(width: 4), _buildTicks(m)],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (reaction.isNotEmpty)
+                          Positioned(
+                            bottom: -4,
+                            right: isMe ? 0 : null,
+                            left: isMe ? null : 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(color: Theme.of(context).cardColor, shape: BoxShape.circle),
+                              child: Text(reaction, style: const TextStyle(fontSize: 12)),
+                            ),
+                          ),
+                      ],
                     ),
-                    title: Text(friend['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    trailing: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: FBColors.primaryBlue),
-                      child: const Text('إرسال', style: TextStyle(color: Colors.white)),
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await _sendMessage(
-                          customText: msg['content'],
-                          cloudImageUrl: msg['image_url'],
-                          isForwarded: true,
-                          directReceiverId: friend['id'],
-                        );
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: 
+                  ),
+                );
+              },
+            ),
+          ),
+          if (_uploadingImage)
+            const Padding(padding: EdgeInsets.all(4), child: Text('جاري رفع الصورة...', style: TextStyle(fontSize: 11, color: Colors.grey))),
+          SafeArea(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              color: Theme.of(context).cardColor,
+              child: Row(
+                children: [
+                  IconButton(icon: const Icon(Icons.image, color: FBColors.primaryBlue), onPressed: _uploadingImage ? null : _pickImage),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? FBColors.darkInput : FBColors.lightInput,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: TextField(
+                        controller: _msgCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'اكتب رسالة...',
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(_isTyping ? Icons.send : Icons.thumb_up, color: FBColors.primaryBlue),
+                    onPressed: () => _send(text: _isTyping ? null : '👍'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

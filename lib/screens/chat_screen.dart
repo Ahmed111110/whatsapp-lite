@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,12 +9,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
 import 'profile_screen.dart';
+import 'chat_details_screen.dart';
 
 final supabase = Supabase.instance.client;
 
-// ==========================================
-// 1. قائمة المحادثات
-// ==========================================
 class ChatsListScreen extends StatefulWidget {
   const ChatsListScreen({super.key});
 
@@ -66,6 +63,16 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
     }
   }
 
+  bool _isOnline(dynamic lastSeen) {
+    if (lastSeen == null) return false;
+    try {
+      final t = DateTime.parse(lastSeen.toString()).toLocal();
+      return DateTime.now().difference(t).inMinutes < 2;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final friendsList = _users.where((u) => _friendIds.contains(u['id'])).toList();
@@ -103,10 +110,30 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
       itemCount: list.length,
       itemBuilder: (ctx, i) {
         final u = list[i];
+        final online = _isOnline(u['last_seen']);
+
         return ListTile(
-          leading: CircleAvatar(
-            backgroundImage: getUniversalImageProvider(u['avatar_url']),
-            child: (u['avatar_url'] == null || u['avatar_url'] == '') ? Text(getFirstChar(u['name'])) : null,
+          leading: Stack(
+            children: [
+              CircleAvatar(
+                backgroundImage: getUniversalImageProvider(u['avatar_url']),
+                child: (u['avatar_url'] == null || u['avatar_url'] == '') ? Text(getFirstChar(u['name'])) : null,
+              ),
+              if (online)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF31A24C),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 2),
+                    ),
+                  ),
+                ),
+            ],
           ),
           title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(isRequest ? 'طلب محادثة' : (u['bio'] ?? 'انقر لفتح المحادثة'), maxLines: 1),
@@ -117,9 +144,6 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
   }
 }
 
-// ==========================================
-// 2. شاشة المحادثة المتقدمة
-// ==========================================
 class ChatScreen extends StatefulWidget {
   final dynamic targetUser;
   const ChatScreen({super.key, required this.targetUser});
@@ -139,20 +163,28 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _targetLastSeen;
   bool _uploadingImage = false;
 
+  String _activeThemeHex = '0xFF0084FF';
+  String _quickEmoji = '👍';
+  Map<String, dynamic>? _replyMessage;
+
   String get _tId => widget.targetUser['id']?.toString() ?? '';
   String get _tName => widget.targetUser['name']?.toString() ?? 'مستخدم أثير';
   String get _tAvatar => widget.targetUser['avatar_url']?.toString() ?? '';
+
+  Color get _themeColor => Color(int.parse(_activeThemeHex));
 
   @override
   void initState() {
     super.initState();
     _msgCtrl.addListener(_onTypingChanged);
+    _loadCloudSettings();
     _updateMyPresence();
     _fetchMessages();
     _checkStatus();
     _timer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
       _fetchMessages(silent: true);
       _checkStatus();
+      _loadCloudSettings(silent: true);
       _updateMyPresence();
     });
   }
@@ -164,6 +196,62 @@ class _ChatScreenState extends State<ChatScreen> {
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCloudSettings({bool silent = false}) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null || _tId.isEmpty) return;
+
+    try {
+      final res = await supabase
+          .from('conversation_settings')
+          .select('theme_color, quick_emoji')
+          .or('and(user1_id.eq.$myId,user2_id.eq.$_tId),and(user1_id.eq.$_tId,user2_id.eq.$myId)')
+          .maybeSingle();
+
+      if (res != null && mounted) {
+        final c = res['theme_color'] ?? '0xFF0084FF';
+        final e = res['quick_emoji'] ?? '👍';
+        if (c != _activeThemeHex || e != _quickEmoji) {
+          setState(() {
+            _activeThemeHex = c;
+            _quickEmoji = e;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveQuickSettings(String hex, String emoji) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null || _tId.isEmpty) return;
+
+    setState(() {
+      _activeThemeHex = hex;
+      _quickEmoji = emoji;
+    });
+
+    try {
+      final existing = await supabase
+          .from('conversation_settings')
+          .select('id')
+          .or('and(user1_id.eq.$myId,user2_id.eq.$_tId),and(user1_id.eq.$_tId,user2_id.eq.$myId)')
+          .maybeSingle();
+
+      if (existing != null) {
+        await supabase.from('conversation_settings').update({
+          'theme_color': hex,
+          'quick_emoji': emoji,
+        }).eq('id', existing['id']);
+      } else {
+        await supabase.from('conversation_settings').insert({
+          'user1_id': myId,
+          'user2_id': _tId,
+          'theme_color': hex,
+          'quick_emoji': emoji,
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _updateMyPresence() async {
@@ -217,11 +305,9 @@ class _ChatScreenState extends State<ChatScreen> {
       final diff = DateTime.now().difference(seenTime);
 
       if (diff.inMinutes < 2) return 'نشط الآن 🟢';
-      if (diff.inMinutes < 60) return 'نشط منذ ${diff.inMinutes} دقيقة';
-      if (diff.inHours < 24) return 'نشط منذ ${diff.inHours} ساعة';
-      if (diff.inDays == 1) return 'نشط بالأمس';
-      if (diff.inDays < 7) return 'نشط منذ ${diff.inDays} أيام';
-      return 'نشط في ${seenTime.day}/${seenTime.month}';
+      if (diff.inMinutes < 60) return 'نشط منذ ${diff.inMinutes} د';
+      if (diff.inHours < 24) return 'نشط منذ ${diff.inHours} س';
+      return 'نشط سابقاً';
     } catch (_) {
       return 'غير متصل';
     }
@@ -245,15 +331,6 @@ class _ChatScreenState extends State<ChatScreen> {
         return true;
       }).toList();
 
-      final unread = raw
-          .where((m) => m['sender_id'] == _tId && m['receiver_id'] == myId && m['is_read'] != true)
-          .map((m) => m['id'])
-          .toList();
-
-      if (unread.isNotEmpty) {
-        await supabase.from('messages').update({'is_read': true, 'is_delivered': true}).filter('id', 'in', unread);
-      }
-
       if (filtered.length != _messages.length || !silent) {
         if (mounted) {
           setState(() => _messages = filtered);
@@ -266,53 +343,42 @@ class _ChatScreenState extends State<ChatScreen> {
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
+        _scrollCtrl.animateTo(_scrollCtrl.position.maxScrollExtent, duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
       }
     });
   }
 
-  Future<void> _send({String? imgUrl, String? text, bool forwarded = false, String? targetId}) async {
-    final content = text ?? _msgCtrl.text.trim();
+  Future<void> _send({String? imgUrl, String? text, bool isBigEmoji = false}) async {
+    String content = text ?? _msgCtrl.text.trim();
     if (content.isEmpty && imgUrl == null) return;
     final myId = supabase.auth.currentUser?.id;
-    final dest = targetId ?? _tId;
-    if (myId == null || dest.isEmpty) return;
+    if (myId == null || _tId.isEmpty) return;
 
-    if (targetId == null) {
-      _msgCtrl.clear();
-      _setTyping(false);
+    if (_replyMessage != null) {
+      final author = _replyMessage!['sender_id'] == myId ? 'أنت' : _tName;
+      final snippet = _replyMessage!['content'] ?? 'صورة';
+      content = '↩️ ردًا على $author: "$snippet"\n$content';
     }
 
-    bool isOnline = false;
-    try {
-      final target = await supabase.from('profiles').select('last_seen').eq('id', dest).maybeSingle();
-      if (target != null && target['last_seen'] != null) {
-        final diff = DateTime.now().difference(DateTime.parse(target['last_seen'].toString()).toLocal()).inMinutes;
-        isOnline = diff < 3;
-      }
-    } catch (_) {}
+    _msgCtrl.clear();
+    setState(() => _replyMessage = null);
+    _setTyping(false);
 
     await supabase.from('messages').insert({
       'sender_id': myId,
-      'receiver_id': dest,
+      'receiver_id': _tId,
       'content': content,
       'image_url': imgUrl ?? '',
       'is_deleted': false,
-      'is_forwarded': forwarded,
-      'is_delivered': isOnline,
       'is_read': false,
-      'reaction': '',
+      'reaction': isBigEmoji ? 'BIG_EMOJI' : '',
     });
 
-    if (targetId == null) _fetchMessages();
+    _fetchMessages();
   }
 
   Future<void> _pickImage() async {
-    final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 65, maxWidth: 900);
+    final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 900);
     if (f == null) return;
     setState(() => _uploadingImage = true);
     final url = await StorageService.uploadImage(file: File(f.path), folder: 'chats');
@@ -320,10 +386,76 @@ class _ChatScreenState extends State<ChatScreen> {
     if (url != null) _send(imgUrl: url, text: '📷 صورة');
   }
 
+  // قائمة الإعدادات السريعة بضغطة زر داخل الشات
+  void _openQuickMessengerSettings() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('تخصيص ماسنجر السريع 🎨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              const Text('اختر لون المحادثة:', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  '0xFF0084FF', // Blue
+                  '0xFF833AB4', // Purple
+                  '0xFFFF5722', // Orange
+                  '0xFF00897B', // Emerald
+                  '0xFFE91E63', // Pink
+                ].map((hex) {
+                  return GestureDetector(
+                    onTap: () {
+                      _saveQuickSettings(hex, _quickEmoji);
+                      Navigator.pop(ctx);
+                    },
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Color(int.parse(hex)),
+                      child: _activeThemeHex == hex ? const Icon(Icons.check, color: Colors.white) : null,
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              const Text('اختر الإيموجي السريع:', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: ['👍', '❤️', '🔥', '😂', '🎉'].map((e) {
+                  return GestureDetector(
+                    onTap: () {
+                      _saveQuickSettings(_activeThemeHex, e);
+                      Navigator.pop(ctx);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _quickEmoji == e ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(e, style: const TextStyle(fontSize: 26)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showMsgMenu(Map<String, dynamic> msg) {
     final myId = supabase.auth.currentUser?.id;
     final bool isMe = msg['sender_id'] == myId;
-    final bool isDel = msg['is_deleted'] == true;
 
     showModalBottomSheet(
       context: context,
@@ -332,34 +464,32 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!isDel)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥'].map((emoji) {
-                    return InkWell(
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        final cur = msg['reaction'] ?? '';
-                        await supabase.from('messages').update({'reaction': cur == emoji ? '' : emoji}).eq('id', msg['id']);
-                        _fetchMessages();
-                      },
-                      child: Text(emoji, style: const TextStyle(fontSize: 26)),
-                    );
-                  }).toList(),
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥'].map((emoji) {
+                  return InkWell(
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final cur = msg['reaction'] ?? '';
+                      await supabase.from('messages').update({'reaction': cur == emoji ? '' : emoji}).eq('id', msg['id']);
+                      _fetchMessages();
+                    },
+                    child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                  );
+                }).toList(),
               ),
+            ),
             const Divider(height: 1),
-            if (!isDel)
-              ListTile(
-                leading: const Icon(Icons.reply, color: FBColors.primaryBlue),
-                title: const Text('إعادة توجيه ↪️'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _forwardMsg(msg);
-                },
-              ),
+            ListTile(
+              leading: Icon(Icons.reply, color: _themeColor),
+              title: const Text('رد على هذه الرسالة 💬'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() => _replyMessage = msg);
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.orange),
               title: const Text('حذف لدي فقط'),
@@ -369,76 +499,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 _fetchMessages();
               },
             ),
-            if (isMe && !isDel)
-              ListTile(
-                leading: const Icon(Icons.delete_forever, color: Colors.redAccent),
-                title: const Text('حذف لدى الجميع 🚫', style: TextStyle(color: Colors.redAccent)),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await supabase.from('messages').update({
-                    'is_deleted': true,
-                    'content': 'تم حذف هذه الرسالة 🚫',
-                    'image_url': '',
-                    'reaction': '',
-                  }).eq('id', msg['id']);
-                  _fetchMessages();
-                },
-              ),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _forwardMsg(Map<String, dynamic> msg) async {
-    final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
-    final f1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId).eq('status', 'accepted');
-    final f2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
-    final ids = <String>{};
-    for (var f in f1) { ids.add(f['receiver_id'].toString()); }
-    for (var f in f2) { ids.add(f['sender_id'].toString()); }
-
-    if (ids.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ليس لديك أصدقاء بعد لإعادة التوجيه لهم!')));
-      return;
-    }
-
-    final friends = await supabase.from('profiles').select().filter('id', 'in', ids.toList());
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => ListView.builder(
-        itemCount: friends.length,
-        itemBuilder: (c, i) {
-          final fr = friends[i];
-          return ListTile(
-            leading: CircleAvatar(backgroundImage: getUniversalImageProvider(fr['avatar_url'])),
-            title: Text(fr['name'] ?? ''),
-            trailing: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: FBColors.primaryBlue),
-              child: const Text('إرسال', style: TextStyle(color: Colors.white)),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await _send(text: msg['content'], imgUrl: msg['image_url'], forwarded: true, targetId: fr['id']);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إعادة التوجيه بنجاح!')));
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildTicks(Map<String, dynamic> m) {
-    if (m['is_read'] == true) {
-      return const Icon(Icons.done_all, size: 14, color: Color(0xFF31A24C));
-    } else if (m['is_delivered'] == true) {
-      return const Icon(Icons.done_all, size: 14, color: Colors.grey);
-    }
-    return const Icon(Icons.done, size: 14, color: Colors.grey);
   }
 
   @override
@@ -450,27 +514,66 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: Row(
-          children: [
-            CircleAvatar(radius: 18, backgroundImage: getUniversalImageProvider(_tAvatar)),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_tName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: statusText.contains('نشط الآن') || statusText.contains('الكتابة')
-                        ? const Color(0xFF31A24C)
-                        : Colors.grey,
+        title: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatDetailsScreen(
+                  targetUser: widget.targetUser,
+                  currentTheme: _activeThemeHex,
+                  currentEmoji: _quickEmoji,
+                  onSettingsChanged: (hex, em) => _saveQuickSettings(hex, em),
+                ),
+              ),
+            );
+          },
+          child: Row(
+            children: [
+              CircleAvatar(radius: 18, backgroundImage: getUniversalImageProvider(_tAvatar)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_tName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: statusText.contains('نشط الآن') || statusText.contains('الكتابة') ? const Color(0xFF31A24C) : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.palette),
+            color: _themeColor,
+            tooltip: 'تغيير السمة السريعة',
+            onPressed: _openQuickMessengerSettings,
+          ),
+          IconButton(
+            icon: Icon(Icons.info, color: _themeColor),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatDetailsScreen(
+                    targetUser: widget.targetUser,
+                    currentTheme: _activeThemeHex,
+                    currentEmoji: _quickEmoji,
+                    onSettingsChanged: (hex, em) => _saveQuickSettings(hex, em),
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -484,91 +587,121 @@ class _ChatScreenState extends State<ChatScreen> {
                 final isMe = m['sender_id'] == myId;
                 final isDel = m['is_deleted'] == true;
                 final String reaction = m['reaction'] ?? '';
+                final bool isBig = reaction == 'BIG_EMOJI';
 
+                // إذا كان إيموجي ضخم
+                if (isBig) {
+                  return Align(
+                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                      child: Text(m['content'] ?? '', style: const TextStyle(fontSize: 48)),
+                    ),
+                  );
+                }
+
+                // سحب ذكي في كلا الاتجاهين يعمل 100% مع العربي
                 return GestureDetector(
+                  onHorizontalDragEnd: (details) {
+                    HapticFeedback.lightImpact();
+                    setState(() => _replyMessage = m);
+                  },
                   onLongPress: () => _showMsgMenu(m),
                   child: Align(
                     alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-                          decoration: BoxDecoration(
-                            color: isDel ? Colors.grey.withOpacity(0.2) : (isMe ? FBColors.primaryBlue : (isDark ? const Color(0xFF3E4042) : const Color(0xFFE4E6EB))),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            children: [
-                              if ((m['image_url'] ?? '').isNotEmpty && !isDel)
-                                Padding(padding: const EdgeInsets.only(bottom: 4), child: renderUniversalImage(m['image_url'], height: 160, width: double.infinity, borderRadius: BorderRadius.circular(8))),
-                              if ((m['content'] ?? '').isNotEmpty)
-                                Text(m['content'] ?? '', style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black), fontSize: 14)),
-                              if (m['is_forwarded'] == true && !isDel)
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 2),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.reply, size: 10, color: Colors.grey),
-                                      SizedBox(width: 2),
-                                      Text('رسالة موجّهة', style: TextStyle(fontSize: 9, color: Colors.grey)),
-                                    ],
-                                  ),
-                                ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(formatArabicTime(m['created_at']), style: TextStyle(fontSize: 8.5, color: isMe ? Colors.white70 : Colors.grey)),
-                                  if (isMe && !isDel) ...[const SizedBox(width: 4), _buildTicks(m)],
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (reaction.isNotEmpty)
-                          Positioned(
-                            bottom: -4,
-                            right: isMe ? 0 : null,
-                            left: isMe ? null : 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(color: Theme.of(context).cardColor, shape: BoxShape.circle),
-                              child: Text(reaction, style: const TextStyle(fontSize: 12)),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+                      decoration: BoxDecoration(
+                        color: isDel
+                            ? Colors.grey.withOpacity(0.2)
+                            : (isMe ? _themeColor : (isDark ? const Color(0xFF3E4042) : const Color(0xFFE4E6EB))),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        children: [
+                          if ((m['image_url'] ?? '').isNotEmpty && !isDel)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: renderUniversalImage(m['image_url'], height: 160, width: double.infinity, borderRadius: BorderRadius.circular(8)),
                             ),
-                          ),
-                      ],
+                          if ((m['content'] ?? '').isNotEmpty)
+                            Text(
+                              m['content'] ?? '',
+                              style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black), fontSize: 14),
+                            ),
+                          const SizedBox(height: 2),
+                          Text(formatArabicTime(m['created_at']), style: TextStyle(fontSize: 8.5, color: isMe ? Colors.white70 : Colors.grey)),
+                        ],
+                      ),
                     ),
                   ),
                 );
               },
             ),
           ),
+
+          // شريط الرد المعلق
+          if (_replyMessage != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              color: isDark ? const Color(0xFF242526) : const Color(0xFFF0F2F5),
+              child: Row(
+                children: [
+                  Icon(Icons.reply, color: _themeColor, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'رد على: ${_replyMessage!['content'] ?? 'صورة'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: () => setState(() => _replyMessage = null),
+                  ),
+                ],
+              ),
+            ),
+
           if (_uploadingImage)
             const Padding(padding: EdgeInsets.all(4), child: Text('جاري رفع الصورة...', style: TextStyle(fontSize: 11, color: Colors.grey))),
+
+          // شريط إدخال الرسائل بنمط ماسنجر
           SafeArea(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               color: Theme.of(context).cardColor,
               child: Row(
                 children: [
-                  IconButton(icon: const Icon(Icons.image, color: FBColors.primaryBlue), onPressed: _uploadingImage ? null : _pickImage),
+                  IconButton(icon: Icon(Icons.image, color: _themeColor), onPressed: _uploadingImage ? null : _pickImage),
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(color: isDark ? FBColors.darkInput : FBColors.lightInput, borderRadius: BorderRadius.circular(20)),
+                      decoration: BoxDecoration(
+                        color: isDark ? FBColors.darkInput : FBColors.lightInput,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                       child: TextField(
                         controller: _msgCtrl,
-                        decoration: const InputDecoration(hintText: 'اكتب رسالة...', border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8)),
+                        decoration: const InputDecoration(
+                          hintText: 'اكتب رسالة...',
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8),
+                        ),
                       ),
                     ),
                   ),
                   IconButton(
-                    icon: Icon(_isTyping ? Icons.send : Icons.thumb_up, color: FBColors.primaryBlue),
-                    onPressed: () => _send(text: _isTyping ? null : '👍'),
+                    icon: _isTyping
+                        ? Icon(Icons.send, color: _themeColor)
+                        : Text(_quickEmoji, style: const TextStyle(fontSize: 24)),
+                    onPressed: () => _send(text: _isTyping ? null : _quickEmoji, isBigEmoji: !_isTyping),
                   ),
                 ],
               ),

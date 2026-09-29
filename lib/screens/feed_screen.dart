@@ -15,7 +15,13 @@ final supabase = Supabase.instance.client;
 
 class FeedScreen extends StatefulWidget {
   final Function(String)? onOpenProfile;
-  const FeedScreen({super.key, this.onOpenProfile});
+  final VoidCallback? onOpenChat;
+
+  const FeedScreen({
+    super.key,
+    this.onOpenProfile,
+    this.onOpenChat,
+  });
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -538,7 +544,6 @@ class _FeedScreenState extends State<FeedScreen> {
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       children: [
-                        // كرت إنشاء قصة
                         GestureDetector(
                           onTap: _addStory,
                           child: Container(
@@ -588,7 +593,6 @@ class _FeedScreenState extends State<FeedScreen> {
                           ),
                         ),
 
-                        // كروت قصص الأصدقاء (تم إصلاحها بأمان تام عبر renderUniversalImage)
                         ..._stories.map((st) {
                           final u = st['profiles'];
                           return GestureDetector(

@@ -74,7 +74,6 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> _loadData() async {
     final myId = supabase.auth.currentUser?.id;
     try {
-      // 1. جلب بروفايل المستخدم الحالي
       if (myId != null) {
         final p = await supabase.from('profiles').select().eq('id', myId).maybeSingle();
         if (p != null) {
@@ -84,15 +83,12 @@ class _FeedScreenState extends State<FeedScreen> {
         }
       }
 
-      // 2. جلب المنشورات بأمان بدون اشتراط علاقة الربط المعقدة
       final postsRaw = await supabase.from('posts').select().order('created_at', ascending: false).limit(40);
       final List<Map<String, dynamic>> loadedPosts = List<Map<String, dynamic>>.from(postsRaw);
 
-      // 3. جلب القصص بأمان
       final storiesRaw = await supabase.from('stories').select().order('created_at', ascending: false).limit(30);
       final List<Map<String, dynamic>> loadedStories = List<Map<String, dynamic>>.from(storiesRaw);
 
-      // 4. تجميع كافة معرفات أصحاب المنشورات والقصص لجلب أسمائهم وصورهم دفعة واحدة
       final Set<String> userIds = {};
       for (var post in loadedPosts) {
         if (post['user_id'] != null) userIds.add(post['user_id'].toString());
@@ -107,16 +103,16 @@ class _FeedScreenState extends State<FeedScreen> {
           for (var item in profilesRes) item['id'].toString(): item
         };
 
-        // دمج بيانات صاحب المنشور داخل كل منشور
         for (var post in loadedPosts) {
           final authorId = post['user_id']?.toString() ?? '';
           post['profiles'] = profilesMap[authorId] ?? {'name': 'مستخدم أثير', 'avatar_url': ''};
         }
 
-        // دمج بيانات صاحب القصة داخل كل قصة
         for (var story in loadedStories) {
           final authorId = story['user_id']?.toString() ?? '';
           story['profiles'] = profilesMap[authorId] ?? {'name': 'مستخدم أثير', 'avatar_url': ''};
+          // ضمان استخراج رابط الصورة سواء كان اسمه media_url أو image_url
+          story['safe_url'] = story['media_url'] ?? story['image_url'] ?? story['url'] ?? '';
         }
       }
 
@@ -131,7 +127,7 @@ class _FeedScreenState extends State<FeedScreen> {
           _loading = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -150,9 +146,7 @@ class _FeedScreenState extends State<FeedScreen> {
       likes.add(myId);
     }
 
-    setState(() {
-      post['likes'] = likes;
-    });
+    setState(() => post['likes'] = likes);
 
     try {
       await supabase.from('posts').update({'likes': likes}).eq('id', postId);
@@ -167,7 +161,7 @@ class _FeedScreenState extends State<FeedScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(
         builder: (c, setM) => Padding(
           padding: EdgeInsets.only(
@@ -219,7 +213,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.photo_library, color: Colors.green),
+                      icon: const Icon(Icons.photo_library, color: FBColors.royalGold),
                       onPressed: () async {
                         final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 1000);
                         if (f != null) setM(() => selectedImgPath = f.path);
@@ -227,7 +221,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
                     const Spacer(),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: FBColors.primaryBlue),
+                      style: ElevatedButton.styleFrom(backgroundColor: FBColors.royalGold, shape: const StadiumBorder()),
                       onPressed: uploading
                           ? null
                           : () async {
@@ -251,8 +245,8 @@ class _FeedScreenState extends State<FeedScreen> {
                               _loadData();
                             },
                       child: uploading
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('نشر', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                          : const Text('نشر', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -264,21 +258,30 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
+  // إضافة قصة مع حفظ الرابط في الحقلين media_url و image_url لتظهر 100% للجميع
   Future<void> _addStory() async {
     final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 1000);
     if (f == null) return;
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري رفع القصة... ⏳')));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري رفع القصة الملكية... ⏳')));
     final url = await StorageService.uploadImage(file: File(f.path), folder: 'stories');
     final myId = supabase.auth.currentUser?.id;
     if (url != null && myId != null) {
-      await supabase.from('stories').insert({
-        'user_id': myId,
-        'media_url': url,
-      });
+      try {
+        await supabase.from('stories').insert({
+          'user_id': myId,
+          'media_url': url,
+          'image_url': url,
+        });
+      } catch (_) {
+        await supabase.from('stories').insert({
+          'user_id': myId,
+          'media_url': url,
+        });
+      }
       _loadData();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة القصة بنجاح! 🎉')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت إضافة القصة بنجاح! 👑')));
     }
   }
 
@@ -286,6 +289,7 @@ class _FeedScreenState extends State<FeedScreen> {
     final myId = supabase.auth.currentUser?.id;
     final bool isMyStory = story['user_id'] == myId;
     final replyCtrl = TextEditingController();
+    final storyImg = story['safe_url'] ?? story['media_url'] ?? story['image_url'] ?? '';
 
     showDialog(
       context: context,
@@ -295,7 +299,7 @@ class _FeedScreenState extends State<FeedScreen> {
         child: Stack(
           children: [
             Center(
-              child: renderUniversalImage(story['media_url'], fit: BoxFit.contain, width: double.infinity),
+              child: renderUniversalImage(storyImg, fit: BoxFit.contain, width: double.infinity),
             ),
             Positioned(
               top: 40,
@@ -314,7 +318,7 @@ class _FeedScreenState extends State<FeedScreen> {
                         Navigator.pop(ctx);
                         await supabase.from('stories').delete().eq('id', story['id']);
                         _loadData();
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف قصتك بنجاح')));
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف قصتك')));
                       },
                     ),
                   IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(ctx)),
@@ -332,7 +336,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.remove_red_eye, color: Colors.white, size: 20),
+                          Icon(Icons.remove_red_eye, color: FBColors.royalGold, size: 20),
                           SizedBox(width: 8),
                           Text('قصتك معروضة لجميع الأصدقاء 👁️', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
                         ],
@@ -345,7 +349,7 @@ class _FeedScreenState extends State<FeedScreen> {
                             controller: replyCtrl,
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
-                              hintText: 'إرسال رد في رسالة...',
+                              hintText: 'إرسال رد ملوكي...',
                               hintStyle: const TextStyle(color: Colors.white70),
                               filled: true,
                               fillColor: Colors.white24,
@@ -355,7 +359,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.send, color: Colors.white),
+                          icon: const Icon(Icons.send, color: FBColors.royalGold),
                           onPressed: () async {
                             final text = replyCtrl.text.trim();
                             if (text.isEmpty || myId == null) return;
@@ -380,7 +384,6 @@ class _FeedScreenState extends State<FeedScreen> {
                               'content': 'تفاعل مع قصتك ❤️',
                               'created_at': DateTime.now().toIso8601String(),
                             });
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال التفاعل بنجاح!')));
                           },
                         ),
                       ],
@@ -455,7 +458,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   child: FutureBuilder(
                     future: supabase.from('comments').select().eq('post_id', postId).order('created_at', ascending: true),
                     builder: (ctx, AsyncSnapshot snap) {
-                      if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: FBColors.primaryBlue));
+                      if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: FBColors.royalGold));
                       final comments = List<Map<String, dynamic>>.from(snap.data);
                       if (comments.isEmpty) return const Center(child: Text('كن أول من يعلق!', style: TextStyle(color: Colors.grey)));
                       return ListView.builder(
@@ -486,7 +489,7 @@ class _FeedScreenState extends State<FeedScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.send, color: FBColors.primaryBlue),
+                        icon: const Icon(Icons.send, color: FBColors.royalGold),
                         onPressed: () async {
                           final text = commentCtrl.text.trim();
                           final myId = supabase.auth.currentUser?.id;
@@ -515,11 +518,59 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final myId = supabase.auth.currentUser?.id;
+    final goldAccent = isDark ? FBColors.royalGold : FBColors.darkAntiqueGold;
 
     return Scaffold(
+      // الشريط العلوي الملوكي المستعاد مع زر التبديل والشات
+      appBar: AppBar(
+        elevation: 0.5,
+        backgroundColor: isDark ? FBColors.darkBg : FBColors.lightBg,
+        title: Row(
+          children: [
+            const Icon(Icons.stars, color: FBColors.royalGold, size: 22),
+            const SizedBox(width: 6),
+            Text(
+              'أثير',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 23,
+                letterSpacing: 1.2,
+                color: goldAccent,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          // زر التبديل بين الوضع النهاري والمظلم (شمس ☀️ / قمر 🌙)
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: FBColors.royalGold,
+              size: 24,
+            ),
+            tooltip: isDark ? 'التحويل للوضع النهاري اللؤلؤي' : 'التحويل للوضع الليلي الملوكي',
+            onPressed: () async {
+              await toggleAppTheme();
+              if (mounted) setState(() {});
+            },
+          ),
+          // زر فتح الدردشات والماسنجر
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline_rounded, color: FBColors.royalGold, size: 22),
+            tooltip: 'المحادثات',
+            onPressed: () {
+              if (widget.onOpenChat != null) {
+                widget.onOpenChat!();
+              }
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: FBColors.primaryBlue))
+          ? const Center(child: CircularProgressIndicator(color: FBColors.royalGold))
           : RefreshIndicator(
+              color: FBColors.royalGold,
               onRefresh: _loadData,
               child: ListView(
                 children: [
@@ -532,12 +583,16 @@ class _FeedScreenState extends State<FeedScreen> {
                           onTap: () {
                             if (myId != null) _goToProfile(myId);
                           },
-                          child: CircleAvatar(
-                            radius: 20,
-                            backgroundImage: getUniversalImageProvider(_myProfile?['avatar_url']),
-                            child: (_myProfile?['avatar_url'] == null || _myProfile?['avatar_url'] == '')
-                                ? Text(getFirstChar(_myProfile?['name'] ?? 'أ'))
-                                : null,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: FBColors.goldGradient),
+                            child: CircleAvatar(
+                              radius: 19,
+                              backgroundImage: getUniversalImageProvider(_myProfile?['avatar_url']),
+                              child: (_myProfile?['avatar_url'] == null || _myProfile?['avatar_url'] == '')
+                                  ? Text(getFirstChar(_myProfile?['name'] ?? 'أ'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))
+                                  : null,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -549,14 +604,15 @@ class _FeedScreenState extends State<FeedScreen> {
                               decoration: BoxDecoration(
                                 color: isDark ? FBColors.darkInput : FBColors.lightInput,
                                 borderRadius: BorderRadius.circular(24),
+                                border: Border.all(color: FBColors.royalGold.withOpacity(0.2)),
                               ),
-                              child: Text('بماذا تفكر يا ${_myProfile?['name'] ?? ''}؟', style: TextStyle(color: isDark ? FBColors.darkSubText : FBColors.lightSubText, fontSize: 13.5)),
+                              child: Text('بماذا تفكر يا ${_myProfile?['name'] ?? ''}؟ ✍️', style: TextStyle(color: isDark ? FBColors.darkSubText : FBColors.lightSubText, fontSize: 13.5)),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         IconButton(
-                          icon: const Icon(Icons.photo_library, color: Color(0xFF45BD62)),
+                          icon: const Icon(Icons.photo_library_outlined, color: FBColors.royalGold),
                           onPressed: _openCreatePostDialog,
                         ),
                       ],
@@ -565,7 +621,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
                   const SizedBox(height: 8),
 
-                  // شريط القصص (الستوري)
+                  // شريط القصص (الستوري) الملوكي
                   Container(
                     color: Theme.of(context).cardColor,
                     height: 190,
@@ -580,16 +636,16 @@ class _FeedScreenState extends State<FeedScreen> {
                             width: 105,
                             margin: const EdgeInsets.only(right: 8),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF242526) : const Color(0xFFF0F2F5),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                              color: isDark ? const Color(0xFF202025) : const Color(0xFFF7F4EC),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: FBColors.royalGold.withOpacity(0.35)),
                             ),
                             child: Column(
                               children: [
                                 Expanded(
                                   flex: 3,
                                   child: ClipRRect(
-                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
                                     child: renderUniversalImage(_myProfile?['avatar_url'], width: double.infinity, fit: BoxFit.cover),
                                   ),
                                 ),
@@ -602,12 +658,12 @@ class _FeedScreenState extends State<FeedScreen> {
                                       Positioned(
                                         top: -16,
                                         child: Container(
-                                          padding: const EdgeInsets.all(3),
+                                          padding: const EdgeInsets.all(2),
                                           decoration: BoxDecoration(color: Theme.of(context).cardColor, shape: BoxShape.circle),
                                           child: const CircleAvatar(
                                             radius: 14,
-                                            backgroundColor: FBColors.primaryBlue,
-                                            child: Icon(Icons.add, color: Colors.white, size: 18),
+                                            backgroundColor: FBColors.royalGold,
+                                            child: Icon(Icons.add, color: Colors.black, size: 18),
                                           ),
                                         ),
                                       ),
@@ -625,6 +681,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
                         ..._stories.map((st) {
                           final u = st['profiles'];
+                          final stImg = st['safe_url'] ?? st['media_url'] ?? st['image_url'] ?? '';
                           return GestureDetector(
                             onTap: () => _openStoryView(st),
                             child: Container(
@@ -632,12 +689,13 @@ class _FeedScreenState extends State<FeedScreen> {
                               margin: const EdgeInsets.only(right: 8),
                               clipBehavior: Clip.antiAlias,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: FBColors.royalGold.withOpacity(0.5), width: 1.5),
                               ),
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  renderUniversalImage(st['media_url'], width: double.infinity, height: double.infinity, fit: BoxFit.cover),
+                                  renderUniversalImage(stImg, width: double.infinity, height: double.infinity, fit: BoxFit.cover),
                                   Container(
                                     decoration: const BoxDecoration(
                                       gradient: LinearGradient(
@@ -652,9 +710,9 @@ class _FeedScreenState extends State<FeedScreen> {
                                     right: 8,
                                     child: Container(
                                       padding: const EdgeInsets.all(2),
-                                      decoration: BoxDecoration(
+                                      decoration: const BoxDecoration(
                                         shape: BoxShape.circle,
-                                        border: Border.all(color: FBColors.primaryBlue, width: 2),
+                                        gradient: FBColors.goldGradient,
                                       ),
                                       child: CircleAvatar(
                                         radius: 15,
@@ -707,10 +765,14 @@ class _FeedScreenState extends State<FeedScreen> {
                                 onTap: () {
                                   if (post['user_id'] != null) _goToProfile(post['user_id']);
                                 },
-                                child: CircleAvatar(
-                                  radius: 20,
-                                  backgroundImage: getUniversalImageProvider(author?['avatar_url']),
-                                  child: (author?['avatar_url'] == null || author?['avatar_url'] == '') ? Text(getFirstChar(author?['name'] ?? 'أ')) : null,
+                                child: Container(
+                                  padding: const EdgeInsets.all(1.5),
+                                  decoration: const BoxDecoration(shape: BoxShape.circle, gradient: FBColors.goldGradient),
+                                  child: CircleAvatar(
+                                    radius: 19,
+                                    backgroundImage: getUniversalImageProvider(author?['avatar_url']),
+                                    child: (author?['avatar_url'] == null || author?['avatar_url'] == '') ? Text(getFirstChar(author?['name'] ?? 'أ')) : null,
+                                  ),
                                 ),
                               ),
                               title: Text(author?['name'] ?? 'مستخدم أثير', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
@@ -738,9 +800,9 @@ class _FeedScreenState extends State<FeedScreen> {
                               child: Row(
                                 children: [
                                   if (likes.isNotEmpty) ...[
-                                    const Icon(Icons.thumb_up, color: FBColors.primaryBlue, size: 14),
+                                    const Icon(Icons.thumb_up, color: FBColors.royalGold, size: 14),
                                     const SizedBox(width: 4),
-                                    Text('${likes.length}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                    Text('${likes.length}', style: TextStyle(fontSize: 12, color: goldAccent, fontWeight: FontWeight.bold)),
                                   ],
                                   const Spacer(),
                                   GestureDetector(
@@ -759,10 +821,10 @@ class _FeedScreenState extends State<FeedScreen> {
                                   child: TextButton.icon(
                                     icon: Icon(
                                       hasLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                                      color: hasLiked ? FBColors.primaryBlue : Colors.grey,
+                                      color: hasLiked ? goldAccent : Colors.grey,
                                       size: 19,
                                     ),
-                                    label: Text('أعجبني', style: TextStyle(color: hasLiked ? FBColors.primaryBlue : (isDark ? Colors.white70 : Colors.black87), fontSize: 13)),
+                                    label: Text('أعجبني', style: TextStyle(color: hasLiked ? goldAccent : (isDark ? Colors.white70 : Colors.black87), fontSize: 13, fontWeight: hasLiked ? FontWeight.bold : FontWeight.normal)),
                                     onPressed: () => _toggleLike(post),
                                   ),
                                 ),

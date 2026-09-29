@@ -5,9 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:record/record.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../services/storage_service.dart';
 import '../utils/constants.dart';
@@ -159,19 +156,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final _msgCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final ImagePicker _picker = ImagePicker();
-  
-  // مشغل ومسجل الصوت
-  final AudioRecorder _audioRecorder = AudioRecorder();
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  String? _currentlyPlayingUrl;
-  Duration _currentAudioPos = Duration.zero;
-  Duration _currentAudioDur = Duration.zero;
-
-  bool _isRecording = false;
-  int _recordDuration = 0;
-  Timer? _recordTimer;
-  String? _recordPath;
-
   List<Map<String, dynamic>> _messages = [];
   Timer? _timer;
   bool _isTyping = false;
@@ -197,8 +181,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _updateMyPresence();
     _fetchMessages();
     _checkStatus();
-    _setupAudioListeners();
-
     _timer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
       _fetchMessages(silent: true);
       _checkStatus();
@@ -207,104 +189,13 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _setupAudioListeners() {
-    _audioPlayer.onPositionChanged.listen((p) {
-      if (mounted) setState(() => _currentAudioPos = p);
-    });
-    _audioPlayer.onDurationChanged.listen((d) {
-      if (mounted) setState(() => _currentAudioDur = d);
-    });
-    _audioPlayer.onPlayerComplete.listen((_) {
-      if (mounted) {
-        setState(() {
-          _currentlyPlayingUrl = null;
-          _currentAudioPos = Duration.zero;
-        });
-      }
-    });
-  }
-
   @override
   void dispose() {
     _timer?.cancel();
-    _recordTimer?.cancel();
-    _audioRecorder.dispose();
-    _audioPlayer.dispose();
     _setTyping(false);
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
-  }
-
-  // ==========================
-  // تسجيل الصوت
-  // ==========================
-  Future<void> _startRecording() async {
-    try {
-      if (await _audioRecorder.hasPermission()) {
-        final dir = await getTemporaryDirectory();
-        _recordPath = '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-        
-        await _audioRecorder.start(
-          const RecordConfig(encoder: AudioEncoder.aacLc),
-          path: _recordPath!,
-        );
-
-        setState(() {
-          _isRecording = true;
-          _recordDuration = 0;
-        });
-
-        _recordTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-          setState(() => _recordDuration++);
-        });
-        HapticFeedback.mediumImpact();
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _stopAndSendRecording() async {
-    _recordTimer?.cancel();
-    try {
-      final path = await _audioRecorder.stop();
-      setState(() => _isRecording = false);
-
-      if (path != null && _recordDuration > 0) {
-        final file = File(path);
-        if (await file.exists()) {
-          final url = await StorageService.uploadImage(file: file, folder: 'chats');
-          if (url != null) {
-            _send(voiceUrl: url, voiceSec: _recordDuration);
-          }
-        }
-      }
-    } catch (_) {
-      setState(() => _isRecording = false);
-    }
-  }
-
-  Future<void> _cancelRecording() async {
-    _recordTimer?.cancel();
-    await _audioRecorder.stop();
-    setState(() {
-      _isRecording = false;
-      _recordDuration = 0;
-    });
-    HapticFeedback.lightImpact();
-  }
-
-  // ==========================
-  // تشغيل الصوت
-  // ==========================
-  Future<void> _togglePlayVoice(String url) async {
-    if (_currentlyPlayingUrl == url) {
-      await _audioPlayer.pause();
-      setState(() => _currentlyPlayingUrl = null);
-    } else {
-      await _audioPlayer.stop();
-      await _audioPlayer.play(UrlSource(url));
-      setState(() => _currentlyPlayingUrl = url);
-    }
   }
 
   Future<void> _loadCloudSettings({bool silent = false}) async {
@@ -457,15 +348,15 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _send({String? imgUrl, String? text, String? voiceUrl, int? voiceSec, bool isBigEmoji = false}) async {
+  Future<void> _send({String? imgUrl, String? text, bool isBigEmoji = false}) async {
     String content = text ?? _msgCtrl.text.trim();
-    if (content.isEmpty && imgUrl == null && voiceUrl == null) return;
+    if (content.isEmpty && imgUrl == null) return;
     final myId = supabase.auth.currentUser?.id;
     if (myId == null || _tId.isEmpty) return;
 
     if (_replyMessage != null) {
       final author = _replyMessage!['sender_id'] == myId ? 'أنت' : _tName;
-      final snippet = _replyMessage!['content'] ?? (_replyMessage!['voice_url'] != null ? 'رسالة صوتية' : 'صورة');
+      final snippet = _replyMessage!['content'] ?? 'صورة';
       content = '↩️ ردًا على $author: "$snippet"\n$content';
     }
 
@@ -478,8 +369,6 @@ class _ChatScreenState extends State<ChatScreen> {
       'receiver_id': _tId,
       'content': content,
       'image_url': imgUrl ?? '',
-      'voice_url': voiceUrl ?? '',
-      'voice_duration': voiceSec ?? 0,
       'is_deleted': false,
       'is_read': false,
       'reaction': isBigEmoji ? 'BIG_EMOJI' : '',
@@ -615,47 +504,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildVoiceBubble(Map<String, dynamic> m, bool isMe) {
-    final voiceUrl = m['voice_url'] ?? '';
-    final int durSec = m['voice_duration'] ?? 0;
-    final bool isPlaying = _currentlyPlayingUrl == voiceUrl;
-
-    return Container(
-      width: 200,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        children: [
-          IconButton(
-            icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, size: 36),
-            color: isMe ? Colors.white : _themeColor,
-            onPressed: () => _togglePlayVoice(voiceUrl),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LinearProgressIndicator(
-                  value: (isPlaying && _currentAudioDur.inSeconds > 0)
-                      ? _currentAudioPos.inSeconds / _currentAudioDur.inSeconds
-                      : 0.0,
-                  backgroundColor: isMe ? Colors.white24 : Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(isMe ? Colors.white : _themeColor),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isPlaying
-                      ? '${_currentAudioPos.inMinutes}:${(_currentAudioPos.inSeconds % 60).toString().padLeft(2, '0')}'
-                      : '${durSec ~/ 60}:${(durSec % 60).toString().padLeft(2, '0')} 🎙️',
-                  style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final myId = supabase.auth.currentUser?.id;
@@ -739,7 +587,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 final isDel = m['is_deleted'] == true;
                 final String reaction = m['reaction'] ?? '';
                 final bool isBig = reaction == 'BIG_EMOJI';
-                final bool hasVoice = (m['voice_url'] ?? '').toString().isNotEmpty;
 
                 if (isBig) {
                   return Align(
@@ -772,7 +619,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: Column(
                         crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                         children: [
-                          if (hasVoice && !isDel) _buildVoiceBubble(m, isMe),
                           if ((m['image_url'] ?? '').isNotEmpty && !isDel)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 4),
@@ -804,7 +650,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'رد على: ${_replyMessage!['content'] ?? (_replyMessage!['voice_url'] != null ? 'رسالة صوتية' : 'صورة')}',
+                      'رد على: ${_replyMessage!['content'] ?? 'صورة'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
@@ -825,62 +671,35 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               color: Theme.of(context).cardColor,
-              child: _isRecording
-                  ? Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                          onPressed: _cancelRecording,
+              child: Row(
+                children: [
+                  IconButton(icon: Icon(Icons.image, color: _themeColor), onPressed: _uploadingImage ? null : _pickImage),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? FBColors.darkInput : FBColors.lightInput,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: TextField(
+                        controller: _msgCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'اكتب رسالة...',
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 8),
                         ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.fiber_manual_record, color: Colors.red, size: 18),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${_recordDuration ~/ 60}:${(_recordDuration % 60).toString().padLeft(2, '0')}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.red),
-                        ),
-                        const Spacer(),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(backgroundColor: _themeColor, shape: const StadiumBorder()),
-                          icon: const Icon(Icons.send, color: Colors.white, size: 16),
-                          label: const Text('إرسال', style: TextStyle(color: Colors.white)),
-                          onPressed: _stopAndSendRecording,
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        IconButton(icon: Icon(Icons.image, color: _themeColor), onPressed: _uploadingImage ? null : _pickImage),
-                        IconButton(
-                          icon: Icon(Icons.mic, color: _themeColor),
-                          onPressed: _startRecording,
-                        ),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: isDark ? FBColors.darkInput : FBColors.lightInput,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: TextField(
-                              controller: _msgCtrl,
-                              decoration: const InputDecoration(
-                                hintText: 'اكتب رسالة...',
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.symmetric(vertical: 8),
-                              ),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: _isTyping
-                              ? Icon(Icons.send, color: _themeColor)
-                              : Text(_quickEmoji, style: const TextStyle(fontSize: 24)),
-                          onPressed: () => _send(text: _isTyping ? null : _quickEmoji, isBigEmoji: !_isTyping),
-                        ),
-                      ],
+                      ),
                     ),
+                  ),
+                  IconButton(
+                    icon: _isTyping
+                        ? Icon(Icons.send, color: _themeColor)
+                        : Text(_quickEmoji, style: const TextStyle(fontSize: 24)),
+                    onPressed: () => _send(text: _isTyping ? null : _quickEmoji, isBigEmoji: !_isTyping),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

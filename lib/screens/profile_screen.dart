@@ -10,10 +10,10 @@ import 'chat_screen.dart';
 final supabase = Supabase.instance.client;
 
 class ProfileScreen extends StatefulWidget {
-  final String userId;
+  final String? userId;
   final Map<String, dynamic>? initialProfile;
 
-  const ProfileScreen({super.key, required this.userId, this.initialProfile});
+  const ProfileScreen({super.key, this.userId, this.initialProfile});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -26,7 +26,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _friendshipStatus = 'none';
   final ImagePicker _picker = ImagePicker();
 
-  bool get _isMe => widget.userId == supabase.auth.currentUser?.id;
+  String get _effectiveUserId => widget.userId ?? supabase.auth.currentUser?.id ?? '';
+  bool get _isMe => _effectiveUserId == (supabase.auth.currentUser?.id ?? '');
 
   @override
   void initState() {
@@ -41,8 +42,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _fetchProfile() async {
+    if (_effectiveUserId.isEmpty) return;
     try {
-      final res = await supabase.from('profiles').select().eq('id', widget.userId).maybeSingle();
+      final res = await supabase.from('profiles').select().eq('id', _effectiveUserId).maybeSingle();
       if (res != null && mounted) {
         setState(() {
           _profile = res;
@@ -55,11 +57,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _fetchUserPosts() async {
+    if (_effectiveUserId.isEmpty) return;
     try {
       final res = await supabase
           .from('posts')
           .select('*, profiles(name, avatar_url)')
-          .eq('user_id', widget.userId)
+          .eq('user_id', _effectiveUserId)
           .order('created_at', ascending: false);
       if (mounted) {
         setState(() => _userPosts = List<Map<String, dynamic>>.from(res));
@@ -69,12 +72,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _checkFriendship() async {
     final myId = supabase.auth.currentUser?.id;
-    if (myId == null) return;
+    if (myId == null || _effectiveUserId.isEmpty) return;
     try {
       final res = await supabase
           .from('friendships')
           .select()
-          .or('and(sender_id.eq.$myId,receiver_id.eq.${widget.userId}),and(sender_id.eq.${widget.userId},receiver_id.eq.$myId)')
+          .or('and(sender_id.eq.$myId,receiver_id.eq.$_effectiveUserId),and(sender_id.eq.$_effectiveUserId,receiver_id.eq.$myId)')
           .maybeSingle();
 
       if (mounted) {
@@ -93,7 +96,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {}
   }
 
-  // نافذة المعاينة والقص وتأكيد حفظ الصورة الشخصية (نمط فيسبوك)
   void _openAvatarConfirmationDialog(File imageFile) {
     final captionCtrl = TextEditingController();
     bool isFitCover = true;
@@ -131,12 +133,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               setM(() => isSaving = true);
                               final url = await StorageService.uploadImage(file: imageFile, folder: 'avatars');
                               if (url != null) {
-                                await supabase.from('profiles').update({'avatar_url': url}).eq('id', widget.userId);
+                                await supabase.from('profiles').update({'avatar_url': url}).eq('id', _effectiveUserId);
                                 
-                                // إذا كتب المستخدم وصفاً، نقوم بإنشاء منشور تلقائي
                                 if (captionCtrl.text.trim().isNotEmpty) {
                                   await supabase.from('posts').insert({
-                                    'user_id': widget.userId,
+                                    'user_id': _effectiveUserId,
                                     'text': captionCtrl.text.trim(),
                                     'image_url': url,
                                     'likes': [],
@@ -161,7 +162,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const Divider(),
                 const SizedBox(height: 12),
 
-                // معاينة الإطار الدائري للصورة
                 Center(
                   child: Stack(
                     alignment: Alignment.center,
@@ -190,7 +190,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // زر لضبط ملء الأبعاد أو الاحتواء
                 TextButton.icon(
                   icon: Icon(isFitCover ? Icons.aspect_ratio : Icons.crop),
                   label: Text(isFitCover ? 'ضبط الأبعاد (ملاءمة كاملة)' : 'ملء الإطار الدائري'),
@@ -198,7 +197,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
 
                 const SizedBox(height: 10),
-                // حقل إضافة وصف أو تعليق على الصورة الشخصية
                 TextField(
                   controller: captionCtrl,
                   maxLines: 2,
@@ -231,7 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري رفع صورة الغلاف... ⏳')));
     final url = await StorageService.uploadImage(file: File(f.path), folder: 'covers');
     if (url != null) {
-      await supabase.from('profiles').update({'cover_url': url}).eq('id', widget.userId);
+      await supabase.from('profiles').update({'cover_url': url}).eq('id', _effectiveUserId);
       _fetchProfile();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث صورة الغلاف!')));
     }
@@ -252,7 +250,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: ListView(
         children: [
-          // رأس الملف الشخصي (الغلاف والصورة الشخصية)
           Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.bottomCenter,
@@ -330,7 +327,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 16),
 
-          // أزرار التحكم بالصداقة والمراسلة
           if (!_isMe)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -352,7 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (_friendshipStatus == 'none') {
                           await supabase.from('friendships').insert({
                             'sender_id': myId,
-                            'receiver_id': widget.userId,
+                            'receiver_id': _effectiveUserId,
                             'status': 'pending',
                           });
                           setState(() => _friendshipStatus = 'sent');

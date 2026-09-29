@@ -56,7 +56,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // جلب المنشورات المضمون بدون أي تعارض في العلاقات
   Future<void> _fetchUserPosts() async {
     if (_effectiveUserId.isEmpty) return;
     try {
@@ -99,9 +98,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {}
   }
 
-  // ==========================================
-  // نافذة المعاينة والقص وتأكيد حفظ الصورة الشخصية
-  // ==========================================
   void _openAvatarConfirmationDialog(File imageFile) {
     final captionCtrl = TextEditingController();
     bool isFitCover = true;
@@ -174,7 +170,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const Divider(),
                 const SizedBox(height: 14),
 
-                // معاينة الإطار الدائري
                 Center(
                   child: Container(
                     width: 210,
@@ -198,7 +193,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // زر التحكم بالأبعاد
                 TextButton.icon(
                   style: TextButton.styleFrom(foregroundColor: FBColors.royalGold),
                   icon: Icon(isFitCover ? Icons.aspect_ratio : Icons.crop),
@@ -207,7 +201,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
 
                 const SizedBox(height: 10),
-                // حقل كتابة منشور مصاحب
                 TextField(
                   controller: captionCtrl,
                   maxLines: 2,
@@ -227,9 +220,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ==========================================
-  // نافذة تعديل بيانات الملف الشخصي (Edit Profile)
-  // ==========================================
   void _openEditProfileDialog() {
     final nameCtrl = TextEditingController(text: _profile?['name'] ?? '');
     final bioCtrl = TextEditingController(text: _profile?['bio'] ?? '');
@@ -367,13 +357,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: ListView(
         children: [
-          // رأس الملف الشخصي بارتفاع كامل يضمن استجابة اللمس 100%
           SizedBox(
             height: 245,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                // صورة الغلاف
                 Positioned(
                   top: 0,
                   left: 0,
@@ -387,13 +375,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
 
-                // زر كاميرا الغلاف
                 if (_isMe)
                   Positioned(
                     top: 125,
                     right: 14,
                     child: CircleAvatar(
-                      backgroundColor: Colors.black70,
+                      backgroundColor: Colors.black54,
                       radius: 18,
                       child: IconButton(
                         icon: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
@@ -402,7 +389,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
 
-                // الصورة الشخصية الدائرية (مستجيبة للمس بالكامل)
                 Positioned(
                   top: 105,
                   left: 0,
@@ -452,7 +438,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 10),
 
-          // الاسم والنبذة التعريفية
           Center(
             child: Column(
               children: [
@@ -468,7 +453,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 16),
 
-          // أزرار التحكم الرسمية (نمط فيسبوك)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _isMe
@@ -554,7 +538,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 12),
 
-          // بطاقة التفاصيل والمعلومات (About Details)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             padding: const EdgeInsets.all(14),
@@ -589,7 +572,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const Divider(thickness: 0.5, height: 26),
 
-          // قائمة المنشورات داخل البروفايل
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(

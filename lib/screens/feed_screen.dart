@@ -14,7 +14,8 @@ import 'chat_screen.dart';
 final supabase = Supabase.instance.client;
 
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key});
+  final Function(String)? onOpenProfile;
+  const FeedScreen({super.key, this.onOpenProfile});
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -32,6 +33,14 @@ class _FeedScreenState extends State<FeedScreen> {
     super.initState();
     _loadCache();
     _loadData();
+  }
+
+  void _goToProfile(String uid) {
+    if (widget.onOpenProfile != null) {
+      widget.onOpenProfile!(uid);
+    } else {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: uid)));
+    }
   }
 
   Future<void> _loadCache() async {
@@ -485,9 +494,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       children: [
                         GestureDetector(
                           onTap: () {
-                            if (myId != null) {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: myId)));
-                            }
+                            if (myId != null) _goToProfile(myId);
                           },
                           child: CircleAvatar(
                             radius: 20,
@@ -522,6 +529,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
                   const SizedBox(height: 8),
 
+                  // شريط القصص (الستوري)
                   Container(
                     color: Theme.of(context).cardColor,
                     height: 190,
@@ -530,6 +538,7 @@ class _FeedScreenState extends State<FeedScreen> {
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       children: [
+                        // كرت إنشاء قصة
                         GestureDetector(
                           onTap: _addStory,
                           child: Container(
@@ -579,6 +588,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           ),
                         ),
 
+                        // كروت قصص الأصدقاء (تم إصلاحها بأمان تام عبر renderUniversalImage)
                         ..._stories.map((st) {
                           final u = st['profiles'];
                           return GestureDetector(
@@ -586,19 +596,17 @@ class _FeedScreenState extends State<FeedScreen> {
                             child: Container(
                               width: 105,
                               margin: const EdgeInsets.only(right: 8),
+                              clipBehavior: Clip.antiAlias,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
-                                image: DecorationImage(
-                                  image: getUniversalImageProvider(st['media_url']),
-                                  fit: BoxFit.cover,
-                                ),
                               ),
                               child: Stack(
+                                fit: StackFit.expand,
                                 children: [
+                                  renderUniversalImage(st['media_url'], width: double.infinity, height: double.infinity, fit: BoxFit.cover),
                                   Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      gradient: const LinearGradient(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
                                         begin: Alignment.topCenter,
                                         end: Alignment.bottomCenter,
                                         colors: [Colors.black38, Colors.transparent, Colors.black87],
@@ -663,9 +671,7 @@ class _FeedScreenState extends State<FeedScreen> {
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                               leading: GestureDetector(
                                 onTap: () {
-                                  if (post['user_id'] != null) {
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: post['user_id'])));
-                                  }
+                                  if (post['user_id'] != null) _goToProfile(post['user_id']);
                                 },
                                 child: CircleAvatar(
                                   radius: 20,

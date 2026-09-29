@@ -14,7 +14,7 @@ import 'profile_screen.dart';
 final supabase = Supabase.instance.client;
 
 // ==========================================
-// 1. قائمة المحادثات (الأصدقاء وطلبات المراسلة)
+// 1. قائمة المحادثات
 // ==========================================
 class ChatsListScreen extends StatefulWidget {
   const ChatsListScreen({super.key});
@@ -51,12 +51,8 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
       final f2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
       
       final s = <String>{};
-      for (var f in f1) {
-        s.add(f['receiver_id'].toString());
-      }
-      for (var f in f2) {
-        s.add(f['sender_id'].toString());
-      }
+      for (var f in f1) { s.add(f['receiver_id'].toString()); }
+      for (var f in f2) { s.add(f['sender_id'].toString()); }
 
       if (mounted) {
         setState(() {
@@ -101,12 +97,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
 
   Widget _buildList(List<Map<String, dynamic>> list, bool isRequest) {
     if (list.isEmpty) {
-      return Center(
-        child: Text(
-          isRequest ? 'لا توجد طلبات مراسلة' : 'ابدأ محادثة مع أصدقائك',
-          style: const TextStyle(color: Colors.grey),
-        ),
-      );
+      return Center(child: Text(isRequest ? 'لا توجد طلبات مراسلة' : 'ابدأ محادثة مع أصدقائك', style: const TextStyle(color: Colors.grey)));
     }
     return ListView.builder(
       itemCount: list.length,
@@ -119,10 +110,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> with SingleTickerProv
           ),
           title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(isRequest ? 'طلب محادثة' : (u['bio'] ?? 'انقر لفتح المحادثة'), maxLines: 1),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => ChatScreen(targetUser: u)),
-          ),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(targetUser: u))),
         );
       },
     );
@@ -148,6 +136,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Timer? _timer;
   bool _isTyping = false;
   bool _targetIsTyping = false;
+  String? _targetLastSeen;
   bool _uploadingImage = false;
 
   String get _tId => widget.targetUser['id']?.toString() ?? '';
@@ -158,10 +147,13 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _msgCtrl.addListener(_onTypingChanged);
+    _updateMyPresence();
     _fetchMessages();
-    _timer = Timer.periodic(const Duration(milliseconds: 1600), (_) {
+    _checkStatus();
+    _timer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
       _fetchMessages(silent: true);
       _checkStatus();
+      _updateMyPresence();
     });
   }
 
@@ -172,6 +164,14 @@ class _ChatScreenState extends State<ChatScreen> {
     _msgCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _updateMyPresence() async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return;
+    try {
+      await supabase.from('profiles').update({'last_seen': DateTime.now().toIso8601String()}).eq('id', myId);
+    } catch (_) {}
   }
 
   void _onTypingChanged() {
@@ -196,13 +196,35 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _checkStatus() async {
     if (_tId.isEmpty) return;
     try {
-      final t = await supabase.from('profiles').select('typing_to').eq('id', _tId).maybeSingle();
+      final t = await supabase.from('profiles').select('typing_to, last_seen').eq('id', _tId).maybeSingle();
       if (t != null && mounted) {
         final myId = supabase.auth.currentUser?.id;
         final bool typing = t['typing_to'] == myId;
-        if (typing != _targetIsTyping) setState(() => _targetIsTyping = typing);
+        setState(() {
+          _targetIsTyping = typing;
+          _targetLastSeen = t['last_seen']?.toString();
+        });
       }
     } catch (_) {}
+  }
+
+  String _formatStatusText() {
+    if (_targetIsTyping) return 'جاري الكتابة... ✍️';
+    if (_targetLastSeen == null || _targetLastSeen!.isEmpty) return 'غير متصل';
+
+    try {
+      final seenTime = DateTime.parse(_targetLastSeen!).toLocal();
+      final diff = DateTime.now().difference(seenTime);
+
+      if (diff.inMinutes < 2) return 'نشط الآن 🟢';
+      if (diff.inMinutes < 60) return 'نشط منذ ${diff.inMinutes} دقيقة';
+      if (diff.inHours < 24) return 'نشط منذ ${diff.inHours} ساعة';
+      if (diff.inDays == 1) return 'نشط بالأمس';
+      if (diff.inDays < 7) return 'نشط منذ ${diff.inDays} أيام';
+      return 'نشط في ${seenTime.day}/${seenTime.month}';
+    } catch (_) {
+      return 'غير متصل';
+    }
   }
 
   Future<void> _fetchMessages({bool silent = false}) async {
@@ -374,12 +396,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final f1 = await supabase.from('friendships').select('receiver_id').eq('sender_id', myId).eq('status', 'accepted');
     final f2 = await supabase.from('friendships').select('sender_id').eq('receiver_id', myId).eq('status', 'accepted');
     final ids = <String>{};
-    for (var f in f1) {
-      ids.add(f['receiver_id'].toString());
-    }
-    for (var f in f2) {
-      ids.add(f['sender_id'].toString());
-    }
+    for (var f in f1) { ids.add(f['receiver_id'].toString()); }
+    for (var f in f2) { ids.add(f['sender_id'].toString()); }
 
     if (ids.isEmpty) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ليس لديك أصدقاء بعد لإعادة التوجيه لهم!')));
@@ -427,6 +445,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final myId = supabase.auth.currentUser?.id;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final statusText = _formatStatusText();
 
     return Scaffold(
       appBar: AppBar(
@@ -439,7 +458,15 @@ class _ChatScreenState extends State<ChatScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(_tName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                Text(_targetIsTyping ? 'جاري الكتابة... ✍️' : 'نشط الآن 🟢', style: const TextStyle(fontSize: 11, color: Color(0xFF31A24C))),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: statusText.contains('نشط الآن') || statusText.contains('الكتابة')
+                        ? const Color(0xFF31A24C)
+                        : Colors.grey,
+                  ),
+                ),
               ],
             ),
           ],
@@ -470,24 +497,16 @@ class _ChatScreenState extends State<ChatScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
                           decoration: BoxDecoration(
-                            color: isDel
-                                ? Colors.grey.withOpacity(0.2)
-                                : (isMe ? FBColors.primaryBlue : (isDark ? const Color(0xFF3E4042) : const Color(0xFFE4E6EB))),
+                            color: isDel ? Colors.grey.withOpacity(0.2) : (isMe ? FBColors.primaryBlue : (isDark ? const Color(0xFF3E4042) : const Color(0xFFE4E6EB))),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Column(
                             crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
                               if ((m['image_url'] ?? '').isNotEmpty && !isDel)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: renderUniversalImage(m['image_url'], height: 160, width: double.infinity, borderRadius: BorderRadius.circular(8)),
-                                ),
+                                Padding(padding: const EdgeInsets.only(bottom: 4), child: renderUniversalImage(m['image_url'], height: 160, width: double.infinity, borderRadius: BorderRadius.circular(8))),
                               if ((m['content'] ?? '').isNotEmpty)
-                                Text(
-                                  m['content'] ?? '',
-                                  style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black), fontSize: 14),
-                                ),
+                                Text(m['content'] ?? '', style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black), fontSize: 14)),
                               if (m['is_forwarded'] == true && !isDel)
                                 const Padding(
                                   padding: EdgeInsets.only(top: 2),
@@ -540,18 +559,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: isDark ? FBColors.darkInput : FBColors.lightInput,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                      decoration: BoxDecoration(color: isDark ? FBColors.darkInput : FBColors.lightInput, borderRadius: BorderRadius.circular(20)),
                       child: TextField(
                         controller: _msgCtrl,
-                        decoration: const InputDecoration(
-                          hintText: 'اكتب رسالة...',
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 8),
-                        ),
+                        decoration: const InputDecoration(hintText: 'اكتب رسالة...', border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 8)),
                       ),
                     ),
                   ),

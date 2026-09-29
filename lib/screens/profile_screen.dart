@@ -82,7 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _loading = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -91,7 +91,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 600);
     if (picked == null) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري رفع صورتك الشخصية وتحديثها سحابياً... ⏳')));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري رفع صورتك الشخصية وتحديثها... ⏳')));
 
     try {
       final cloudUrl = await StorageService.uploadImage(file: File(picked.path), folder: 'avatars');
@@ -99,14 +100,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         await supabase.from('profiles').update({'avatar_url': cloudUrl}).eq('id', _targetId);
         await supabase.from('posts').update({'author_avatar': cloudUrl}).eq('user_id', _targetId);
 
-        setState(() {
-          _profile?['avatar_url'] = cloudUrl;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث صورتك الشخصية بنجاح! 🎉')));
+        if (mounted) {
+          setState(() {
+            _profile?['avatar_url'] = cloudUrl;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث صورتك الشخصية بنجاح! 🎉')));
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل رفع الصورة: $e'), backgroundColor: Colors.redAccent));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل رفع الصورة: $e'), backgroundColor: Colors.redAccent));
     }
   }
 
@@ -114,19 +116,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 1200);
     if (picked == null) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري رفع غلاف الصفحة... ⏳')));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جاري رفع صورة الغلاف... ⏳')));
 
     try {
       final cloudUrl = await StorageService.uploadImage(file: File(picked.path), folder: 'covers');
       if (cloudUrl != null) {
         await supabase.from('profiles').update({'cover_url': cloudUrl}).eq('id', _targetId);
-        setState(() {
-          _profile?['cover_url'] = cloudUrl;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث صورة الغلاف بنجاح! 🖼️')));
+        if (mounted) {
+          setState(() {
+            _profile?['cover_url'] = cloudUrl;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث صورة الغلاف بنجاح! 🖼️')));
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل رفع الغلاف: $e'), backgroundColor: Colors.redAccent));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل رفع الغلاف: $e'), backgroundColor: Colors.redAccent));
     }
   }
 
@@ -174,15 +179,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))
             : null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
           if (_isMyProfile)
-            IconButton(
-              icon: const Icon(Icons.settings, color: FBColors.primaryBlue),
-              onPressed: () => _openSettingsModal(),
-            ),
+            IconButton(icon: const Icon(Icons.settings, color: FBColors.primaryBlue), onPressed: () => _openSettingsModal()),
         ],
       ),
       body: _loading
@@ -191,94 +190,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onRefresh: _loadProfileData,
               child: ListView(
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      GestureDetector(
-                        onTap: _isMyProfile ? _changeCover : null,
-                        child: Container(
-                          height: 190,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF3A3B3C) : const Color(0xFFE4E6EB),
-                            gradient: cover.isEmpty
-                                ? const LinearGradient(
-                                    colors: [Color(0xFF0052D4), Color(0xFF4364F7), Color(0xFF6FB1FC)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  )
-                                : null,
-                          ),
-                          child: cover.isNotEmpty
-                              ? renderUniversalImage(cover, fit: BoxFit.cover, width: double.infinity)
-                              : null,
-                        ),
-                      ),
-                      if (_isMyProfile)
+                  SizedBox(
+                    height: 250,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
                         Positioned(
-                          bottom: 12,
-                          left: 12,
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 190,
                           child: GestureDetector(
-                            onTap: _changeCover,
+                            onTap: _isMyProfile ? _changeCover : null,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.65),
-                                borderRadius: BorderRadius.circular(8),
+                              color: isDark ? const Color(0xFF3A3B3C) : const Color(0xFFE4E6EB),
+                              child: cover.isNotEmpty
+                                  ? renderUniversalImage(cover, fit: BoxFit.cover, width: double.infinity)
+                                  : Container(
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [Color(0xFF0052D4), Color(0xFF4364F7), Color(0xFF6FB1FC)],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                        if (_isMyProfile)
+                          Positioned(
+                            top: 140,
+                            left: 12,
+                            child: GestureDetector(
+                              onTap: _changeCover,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.65),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                                    SizedBox(width: 4),
+                                    Text('تعديل الغلاف', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
                               ),
-                              child: const Row(
+                            ),
+                          ),
+                        Positioned(
+                          top: 130,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: GestureDetector(
+                              onTap: _isMyProfile ? _changeAvatar : null,
+                              child: Stack(
+                                alignment: Alignment.bottomRight,
                                 children: [
-                                  Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                                  SizedBox(width: 4),
-                                  Text('تعديل الغلاف', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).scaffoldBackgroundColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 52,
+                                      backgroundColor: FBColors.primaryBlue,
+                                      backgroundImage: getUniversalImageProvider(avatar),
+                                      child: (avatar.isEmpty) ? Text(getFirstChar(name), style: const TextStyle(fontSize: 44, color: Colors.white)) : null,
+                                    ),
+                                  ),
+                                  if (_isMyProfile)
+                                    Container(
+                                      padding: const EdgeInsets.all(7),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF3A3B3C) : const Color(0xFFE4E6EB),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 2),
+                                      ),
+                                      child: const Icon(Icons.camera_alt, size: 19),
+                                    ),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                      Positioned(
-                        bottom: -48,
-                        child: Stack(
-                          alignment: Alignment.bottomRight,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).scaffoldBackgroundColor,
-                                shape: BoxShape.circle,
-                              ),
-                              child: CircleAvatar(
-                                radius: 52,
-                                backgroundColor: FBColors.primaryBlue,
-                                backgroundImage: getUniversalImageProvider(avatar),
-                                child: (avatar.isEmpty) ? Text(getFirstChar(name), style: const TextStyle(fontSize: 44, color: Colors.white)) : null,
-                              ),
-                            ),
-                            if (_isMyProfile)
-                              Positioned(
-                                bottom: 4,
-                                right: 4,
-                                child: GestureDetector(
-                                  onTap: _changeAvatar,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF3A3B3C) : const Color(0xFFE4E6EB),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 2),
-                                    ),
-                                    child: const Icon(Icons.camera_alt, size: 18),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-
-                  const SizedBox(height: 56),
 
                   Center(
                     child: Row(
@@ -331,8 +333,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               onPressed: () => _openFullEditModal(),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          _circleActionBtn(Icons.more_horiz, () => _openSettingsModal()),
                         ] else ...[
                           Expanded(
                             child: ElevatedButton.icon(
@@ -372,15 +372,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 final dynamic targetData = _profile ?? <String, dynamic>{'id': _targetId, 'name': name, 'avatar_url': avatar};
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatScreen(targetUser: targetData),
-                                  ),
+                                  MaterialPageRoute(builder: (_) => ChatScreen(targetUser: targetData)),
                                 );
                               },
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          _circleActionBtn(Icons.more_horiz, () {}),
                         ],
                       ],
                     ),
@@ -425,18 +421,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('الأصدقاء', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                                Text('${_friends.length} من الأصدقاء', style: TextStyle(fontSize: 12, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
-                              ],
-                            ),
-                          ],
-                        ),
+                        Text('الأصدقاء (${_friends.length})', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 12),
                         if (_friends.isEmpty)
                           const Text('لا يوجد أصدقاء للعرض حالياً.', style: TextStyle(fontSize: 12, color: Colors.grey))
@@ -526,21 +511,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _circleActionBtn(IconData icon, VoidCallback onTap) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(9),
-        decoration: BoxDecoration(
-          color: isDark ? FBColors.darkInput : FBColors.lightInput,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, size: 20, color: isDark ? Colors.white : Colors.black),
-      ),
     );
   }
 

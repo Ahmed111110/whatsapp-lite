@@ -3,7 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ==========================================
-// 1. محرك التبديل الملوكي (Theme Notifier)
+// 1. خريطة الدول والمدن (الضرورية جداً لـ main.dart)
+// ==========================================
+const Map<String, List<String>> locationsData = {
+  'فلسطين': ['غزة', 'خان يونس', 'رفح', 'القدس', 'رام الله', 'نابلس', 'الخليل', 'جنين', 'طولكرم', 'قلقيلية', 'أريحا', 'بيت لحم'],
+  'مصر': ['القاهرة', 'الإسكندرية', 'الجيزة', 'المنصورة', 'بورسعيد', 'طنطا', 'أسيوط', 'الإسماعيلية'],
+  'الأردن': ['عمان', 'إربد', 'الزرقاء', 'العقبة', 'السلط', 'مادبا'],
+  'تونس': ['تونس العاصمة', 'صفاقس', 'سوسة', 'القيروان', 'بنزرت', 'المنستير', 'منوبة'],
+  'الجزائر': ['الجزائر العاصمة', 'وهران', 'قسنطينة', 'عنابة', 'سطيف', 'باتنة'],
+  'المغرب': ['الرباط', 'الدار البيضاء', 'مراكش', 'فاس', 'طنجة', 'أكادير'],
+  'سوريا': ['دمشق', 'حلب', 'حمص', 'اللاذقية', 'حماة'],
+  'لبنان': ['بيروت', 'طرابلس', 'صيدا', 'صور'],
+  'العراق': ['بغداد', 'البصرة', 'الموصل', 'أربيل', 'النجف', 'كربلاء'],
+  'السعودية': ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام'],
+  'الإمارات': ['أبوظبي', 'دبي', 'الشارقة', 'عجمان'],
+};
+
+// ==========================================
+// 2. محرك التبديل الملوكي (Theme Notifier)
 // ==========================================
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
 
@@ -25,30 +42,26 @@ Future<void> toggleAppTheme() async {
 }
 
 // ==========================================
-// 2. باليت الألوان الملوكية الذهبية (Royal Gold)
+// 3. باليت الألوان الملوكية الذهبية (Royal Gold)
 // ==========================================
 class FBColors {
-  // الذهب الملوكي الرئيسي في كلا الوضعين
   static const Color primaryBlue = Color(0xFFD4AF37); // Royal Gold
   static const Color royalGold = Color(0xFFD4AF37);
   static const Color champagneGold = Color(0xFFE5C158);
   static const Color darkAntiqueGold = Color(0xFFA67C1E);
 
-  // التدرج الذهبي الفاخر
   static const LinearGradient goldGradient = LinearGradient(
     colors: [Color(0xFFF3E7BE), Color(0xFFD4AF37), Color(0xFFA67C1E)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  // الوضع الليلي الملوكي (Obsidian & Gold)
   static const Color darkBg = Color(0xFF0D0D11);
   static const Color darkCard = Color(0xFF16161B);
   static const Color darkInput = Color(0xFF222228);
   static const Color darkSubText = Color(0xFFA8A396);
   static const Color darkBorder = Color(0xFF2E2A20);
 
-  // الوضع النهاري الملوكي اللؤلؤي (Pearl & Antique Gold)
   static const Color lightBg = Color(0xFFFBF9F4);
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightInput = Color(0xFFF2EFE9);
@@ -57,8 +70,13 @@ class FBColors {
 }
 
 // ==========================================
-// 3. معالج الصور والوقت
+// 4. معالج النصوص والصور (متوافق مع main.dart 100%)
 // ==========================================
+String getFirstChar(dynamic name, [String fallback = 'أ']) {
+  if (name == null || name.toString().trim().isEmpty) return fallback;
+  return name.toString().trim().characters.first.toUpperCase();
+}
+
 ImageProvider getUniversalImageProvider(dynamic url) {
   if (url == null || url.toString().trim().isEmpty) {
     return const AssetImage('assets/images/default_avatar.png');
@@ -99,11 +117,6 @@ Widget renderUniversalImage(dynamic url, {double? width, double? height, BoxFit 
     );
   }
   return borderRadius != null ? ClipRRect(borderRadius: borderRadius, child: img) : img;
-}
-
-String getFirstChar(dynamic name) {
-  if (name == null || name.toString().isEmpty) return 'أ';
-  return name.toString().trim().characters.first.toUpperCase();
 }
 
 String formatArabicTime(dynamic timeStr) {

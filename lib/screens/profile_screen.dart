@@ -56,16 +56,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // جلب المنشورات المضمون بدون أي تعارض في العلاقات
   Future<void> _fetchUserPosts() async {
     if (_effectiveUserId.isEmpty) return;
     try {
       final res = await supabase
           .from('posts')
-          .select('*, profiles(name, avatar_url)')
+          .select()
           .eq('user_id', _effectiveUserId)
           .order('created_at', ascending: false);
       if (mounted) {
-        setState(() => _userPosts = List<Map<String, dynamic>>.from(res));
+        setState(() {
+          _userPosts = List<Map<String, dynamic>>.from(res);
+        });
       }
     } catch (_) {}
   }
@@ -96,6 +99,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {}
   }
 
+  // ==========================================
+  // نافذة المعاينة والقص وتأكيد حفظ الصورة الشخصية
+  // ==========================================
   void _openAvatarConfirmationDialog(File imageFile) {
     final captionCtrl = TextEditingController();
     bool isFitCover = true;
@@ -105,7 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => StatefulBuilder(
         builder: (c, setM) => Padding(
           padding: EdgeInsets.only(
@@ -125,8 +131,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(ctx),
                     ),
-                    const Text('معاينة الصورة الشخصية', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    TextButton(
+                    const Text('معاينة وتأكيد الصورة 👑', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: FBColors.royalGold,
+                        foregroundColor: Colors.black,
+                        shape: const StadiumBorder(),
+                        elevation: 0,
+                      ),
                       onPressed: isSaving
                           ? null
                           : () async {
@@ -134,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               final url = await StorageService.uploadImage(file: imageFile, folder: 'avatars');
                               if (url != null) {
                                 await supabase.from('profiles').update({'avatar_url': url}).eq('id', _effectiveUserId);
-                                
+
                                 if (captionCtrl.text.trim().isNotEmpty) {
                                   await supabase.from('posts').insert({
                                     'user_id': _effectiveUserId,
@@ -143,7 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     'likes': [],
                                   });
                                 }
-                                
+
                                 Navigator.pop(ctx);
                                 _fetchProfile();
                                 _fetchUserPosts();
@@ -154,49 +166,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               setM(() => isSaving = false);
                             },
                       child: isSaving
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('حفظ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: FBColors.primaryBlue)),
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                          : const Text('حفظ وتأكيد', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
                 const Divider(),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
 
+                // معاينة الإطار الدائري
                 Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 220,
-                        height: 220,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: FBColors.primaryBlue, width: 3),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10, spreadRadius: 2),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: Image.file(
-                            imageFile,
-                            width: 220,
-                            height: 220,
-                            fit: isFitCover ? BoxFit.cover : BoxFit.contain,
-                          ),
-                        ),
+                  child: Container(
+                    width: 210,
+                    height: 210,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: FBColors.royalGold, width: 3),
+                      boxShadow: [
+                        BoxShadow(color: FBColors.royalGold.withOpacity(0.3), blurRadius: 16, spreadRadius: 2),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Image.file(
+                        imageFile,
+                        width: 210,
+                        height: 210,
+                        fit: isFitCover ? BoxFit.cover : BoxFit.contain,
                       ),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
 
+                // زر التحكم بالأبعاد
                 TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: FBColors.royalGold),
                   icon: Icon(isFitCover ? Icons.aspect_ratio : Icons.crop),
-                  label: Text(isFitCover ? 'ضبط الأبعاد (ملاءمة كاملة)' : 'ملء الإطار الدائري'),
+                  label: Text(isFitCover ? 'ضبط الأبعاد (ملاءمة كاملة)' : 'ملء الإطار الدائري (توسيع)', style: const TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: () => setM(() => isFitCover = !isFitCover),
                 ),
 
                 const SizedBox(height: 10),
+                // حقل كتابة منشور مصاحب
                 TextField(
                   controller: captionCtrl,
                   maxLines: 2,
@@ -204,10 +215,115 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     hintText: 'اكتب وصفاً أو تعليقاً على صورتك الشخصية...',
                     filled: true,
                     fillColor: Colors.grey.withOpacity(0.1),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // نافذة تعديل بيانات الملف الشخصي (Edit Profile)
+  // ==========================================
+  void _openEditProfileDialog() {
+    final nameCtrl = TextEditingController(text: _profile?['name'] ?? '');
+    final bioCtrl = TextEditingController(text: _profile?['bio'] ?? '');
+    final locationCtrl = TextEditingController(text: _profile?['location'] ?? 'فلسطين، خان يونس');
+    bool saving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (c, setM) => Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('تعديل الملف الشخصي ✏️', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const Divider(),
+                const SizedBox(height: 10),
+                const Text('الاسم الكامل:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.grey.withOpacity(0.1),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                const Text('النبذة التعريفية (Bio):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: bioCtrl,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.grey.withOpacity(0.1),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('مكان الإقامة / المدينة:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: locationCtrl,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: Colors.grey.withOpacity(0.1),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: FBColors.royalGold,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            setM(() => saving = true);
+                            await supabase.from('profiles').update({
+                              'name': nameCtrl.text.trim(),
+                              'bio': bioCtrl.text.trim(),
+                              'location': locationCtrl.text.trim(),
+                            }).eq('id', _effectiveUserId);
+
+                            Navigator.pop(ctx);
+                            _fetchProfile();
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث البيانات بنجاح! ✨')));
+                          },
+                    child: saving
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                        : const Text('حفظ التعديلات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ),
+                ),
               ],
             ),
           ),
@@ -238,88 +354,113 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading && _profile == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: FBColors.primaryBlue)));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: FBColors.royalGold)));
     }
 
     final p = _profile ?? {};
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final goldAccent = isDark ? FBColors.royalGold : FBColors.darkAntiqueGold;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(p['name'] ?? 'الملف الشخصي', style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(p['name'] ?? 'الملف الشخصي', style: TextStyle(fontWeight: FontWeight.bold, color: goldAccent)),
       ),
       body: ListView(
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomCenter,
-            children: [
-              Container(
-                height: 180,
-                width: double.infinity,
-                color: isDark ? const Color(0xFF3A3B3C) : const Color(0xFFCCD0D5),
-                child: (p['cover_url'] != null && (p['cover_url'] as String).isNotEmpty)
-                    ? renderUniversalImage(p['cover_url'], fit: BoxFit.cover, width: double.infinity, height: 180)
-                    : const Center(child: Icon(Icons.image, size: 50, color: Colors.grey)),
-              ),
-              if (_isMe)
+          // رأس الملف الشخصي بارتفاع كامل يضمن استجابة اللمس 100%
+          SizedBox(
+            height: 245,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // صورة الغلاف
                 Positioned(
-                  bottom: 10,
-                  right: 10,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.black54,
-                    radius: 18,
-                    child: IconButton(
-                      icon: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                      onPressed: _pickCover,
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 175,
+                  child: Container(
+                    color: isDark ? const Color(0xFF232328) : const Color(0xFFE5E2DA),
+                    child: (p['cover_url'] != null && (p['cover_url'] as String).isNotEmpty)
+                        ? renderUniversalImage(p['cover_url'], fit: BoxFit.cover, width: double.infinity, height: 175)
+                        : const Center(child: Icon(Icons.image, size: 50, color: Colors.grey)),
+                  ),
+                ),
+
+                // زر كاميرا الغلاف
+                if (_isMe)
+                  Positioned(
+                    top: 125,
+                    right: 14,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black70,
+                      radius: 18,
+                      child: IconButton(
+                        icon: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                        onPressed: _pickCover,
+                      ),
+                    ),
+                  ),
+
+                // الصورة الشخصية الدائرية (مستجيبة للمس بالكامل)
+                Positioned(
+                  top: 105,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: _isMe ? _pickAvatar : null,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: FBColors.goldGradient,
+                            ),
+                            child: CircleAvatar(
+                              radius: 60,
+                              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                              child: CircleAvatar(
+                                radius: 56,
+                                backgroundImage: getUniversalImageProvider(p['avatar_url']),
+                                child: (p['avatar_url'] == null || p['avatar_url'] == '')
+                                    ? Text(getFirstChar(p['name'] ?? 'أ'), style: const TextStyle(fontSize: 36, color: Colors.black, fontWeight: FontWeight.bold))
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          if (_isMe)
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: FBColors.royalGold,
+                                shape: BoxShape.circle,
+                                boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 4)],
+                              ),
+                              child: const Icon(Icons.camera_alt, color: Colors.black, size: 18),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              Positioned(
-                bottom: -50,
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 54,
-                      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundImage: getUniversalImageProvider(p['avatar_url']),
-                        child: (p['avatar_url'] == null || p['avatar_url'] == '')
-                            ? Text(getFirstChar(p['name'] ?? 'أ'), style: const TextStyle(fontSize: 34))
-                            : null,
-                      ),
-                    ),
-                    if (_isMe)
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: CircleAvatar(
-                          backgroundColor: FBColors.primaryBlue,
-                          radius: 16,
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                            onPressed: _pickAvatar,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
 
-          const SizedBox(height: 56),
+          const SizedBox(height: 10),
 
+          // الاسم والنبذة التعريفية
           Center(
             child: Column(
               children: [
-                Text(p['name'] ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(p['name'] ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                 if ((p['bio'] ?? '').isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                    child: Text(p['bio'] ?? '', textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                    child: Text(p['bio'] ?? '', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: isDark ? FBColors.darkSubText : FBColors.lightSubText)),
                   ),
               ],
             ),
@@ -327,60 +468,150 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 16),
 
-          if (!_isMe)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _friendshipStatus == 'friends' ? Colors.grey.shade300 : FBColors.primaryBlue,
-                        foregroundColor: _friendshipStatus == 'friends' ? Colors.black87 : Colors.white,
-                      ),
-                      icon: Icon(_friendshipStatus == 'friends' ? Icons.check : Icons.person_add),
-                      label: Text(_friendshipStatus == 'friends'
-                          ? 'أصدقاء'
-                          : (_friendshipStatus == 'sent' ? 'تم إرسال الطلب' : 'إضافة صديق')),
-                      onPressed: () async {
-                        final myId = supabase.auth.currentUser?.id;
-                        if (myId == null) return;
-                        if (_friendshipStatus == 'none') {
-                          await supabase.from('friendships').insert({
-                            'sender_id': myId,
-                            'receiver_id': _effectiveUserId,
-                            'status': 'pending',
-                          });
-                          setState(() => _friendshipStatus = 'sent');
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: isDark ? const Color(0xFF3E4042) : const Color(0xFFE4E6EB)),
-                      icon: Icon(Icons.chat, color: isDark ? Colors.white : Colors.black),
-                      label: Text('مراسلة', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(targetUser: p))),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          const Divider(thickness: 0.5, height: 30),
-
+          // أزرار التحكم الرسمية (نمط فيسبوك)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('المنشورات (${_userPosts.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            child: _isMe
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: FBColors.royalGold,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.add_circle, size: 18),
+                          label: const Text('إضافة إلى القصة', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يمكنك إضافة قصة مباشرة من الشاشة الرئيسية 🌟')));
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDark ? const Color(0xFF26262B) : const Color(0xFFE8E5DD),
+                            foregroundColor: isDark ? Colors.white : Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.edit, size: 18),
+                          label: const Text('تعديل الملف الشخصي', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: _openEditProfileDialog,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _friendshipStatus == 'friends' ? Colors.grey.shade400 : FBColors.royalGold,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: Icon(_friendshipStatus == 'friends' ? Icons.check : Icons.person_add),
+                          label: Text(_friendshipStatus == 'friends'
+                              ? 'أصدقاء'
+                              : (_friendshipStatus == 'sent' ? 'تم إرسال الطلب' : 'إضافة صديق'),
+                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            final myId = supabase.auth.currentUser?.id;
+                            if (myId == null) return;
+                            if (_friendshipStatus == 'none') {
+                              await supabase.from('friendships').insert({
+                                'sender_id': myId,
+                                'receiver_id': _effectiveUserId,
+                                'status': 'pending',
+                              });
+                              setState(() => _friendshipStatus = 'sent');
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDark ? const Color(0xFF26262B) : const Color(0xFFE8E5DD),
+                            foregroundColor: isDark ? Colors.white : Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          label: const Text('مراسلة', style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(targetUser: p))),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+
+          // بطاقة التفاصيل والمعلومات (About Details)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: FBColors.royalGold.withOpacity(0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('التفاصيل 📌', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, color: FBColors.royalGold, size: 18),
+                    const SizedBox(width: 8),
+                    Text('يقيم في ${p['location'] ?? 'فلسطين، خان يونس'}', style: const TextStyle(fontSize: 13.5)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_filled, color: FBColors.royalGold, size: 18),
+                    const SizedBox(width: 8),
+                    Text('انضم إلى منصة أثير ${formatArabicTime(p['created_at'])}', style: const TextStyle(fontSize: 13.5)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(thickness: 0.5, height: 26),
+
+          // قائمة المنشورات داخل البروفايل
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('المنشورات (${_userPosts.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                if (_isMe)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(foregroundColor: FBColors.royalGold),
+                    icon: const Icon(Icons.edit, size: 16),
+                    label: const Text('تعديل'),
+                    onPressed: _openEditProfileDialog,
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 6),
 
           if (_userPosts.isEmpty)
             const Padding(
-              padding: EdgeInsets.all(24),
+              padding: EdgeInsets.all(30),
               child: Center(child: Text('لا توجد منشورات لهذا المستخدم بعد')),
             )
           else
@@ -392,8 +623,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(formatArabicTime(post['created_at']), style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundImage: getUniversalImageProvider(p['avatar_url']),
+                          child: (p['avatar_url'] == null || p['avatar_url'] == '') ? Text(getFirstChar(p['name'])) : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                            Text(formatArabicTime(post['created_at']), style: const TextStyle(fontSize: 10.5, color: Colors.grey)),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
                     if ((post['text'] ?? '').isNotEmpty)
                       Text(post['text'] ?? '', style: const TextStyle(fontSize: 14)),
                     if ((post['image_url'] ?? '').isNotEmpty)

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,6 +34,17 @@ class _FeedScreenState extends State<FeedScreen> {
   Map<String, dynamic>? _myProfile;
   bool _loading = true;
   final ImagePicker _picker = ImagePicker();
+
+  // بيانات تفاعلات فيسبوك الرسمية
+  final Map<String, Map<String, dynamic>> _fbReactions = {
+    'like': {'label': 'أعجبني', 'emoji': '👍', 'color': FBColors.royalGold},
+    'love': {'label': 'أحببته', 'emoji': '❤️', 'color': Colors.redAccent},
+    'care': {'label': 'أدعمه', 'emoji': '🥰', 'color': const Color(0xFFF7B125)},
+    'haha': {'label': 'أضحكني', 'emoji': '😂', 'color': const Color(0xFFF7B125)},
+    'wow': {'label': 'واو', 'emoji': '😮', 'color': const Color(0xFFF7B125)},
+    'sad': {'label': 'أحزنني', 'emoji': '😢', 'color': const Color(0xFFF7B125)},
+    'angry': {'label': 'أغضبني', 'emoji': '😡', 'color': Colors.deepOrange},
+  };
 
   @override
   void initState() {
@@ -83,7 +95,7 @@ class _FeedScreenState extends State<FeedScreen> {
         }
       }
 
-      final postsRaw = await supabase.from('posts').select().order('created_at', ascending: false).limit(40);
+      final postsRaw = await supabase.from('posts').select().order('created_at', ascending: false).limit(50);
       final List<Map<String, dynamic>> loadedPosts = List<Map<String, dynamic>>.from(postsRaw);
 
       final storiesRaw = await supabase.from('stories').select().order('created_at', ascending: false).limit(30);
@@ -111,8 +123,7 @@ class _FeedScreenState extends State<FeedScreen> {
         for (var story in loadedStories) {
           final authorId = story['user_id']?.toString() ?? '';
           story['profiles'] = profilesMap[authorId] ?? {'name': 'مستخدم أثير', 'avatar_url': ''};
-          // ضمان استخراج رابط الصورة سواء كان اسمه media_url أو image_url
-          story['safe_url'] = story['media_url'] ?? story['image_url'] ?? story['url'] ?? '';
+          story['safe_url'] = story['media_url'] ?? story['image_url'] ?? '';
         }
       }
 
@@ -132,27 +143,241 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
-  Future<void> _toggleLike(Map<String, dynamic> post) async {
+  // ==========================================
+  // نظام التفاعل الذكي (Facebook Reactions)
+  // ==========================================
+  Map<String, dynamic> _extractReactions(Map<String, dynamic> post) {
+    if (post['reactions'] != null && post['reactions'] is Map) {
+      return Map<String, dynamic>.from(post['reactions']);
+    }
+    // دعم رجعي إذا كان محفوظاً كمصفوفة قديمة
+    final Map<String, dynamic> converted = {};
+    if (post['likes'] != null && post['likes'] is List) {
+      for (var id in post['likes']) {
+        converted[id.toString()] = 'like';
+      }
+    }
+    return converted;
+  }
+
+  Future<void> _setReaction(Map<String, dynamic> post, String reactionKey) async {
     final myId = supabase.auth.currentUser?.id;
     if (myId == null) return;
 
     final postId = post['id'];
-    List likes = List.from(post['likes'] ?? []);
-    bool isLiked = likes.contains(myId);
+    final currentReactions = _extractReactions(post);
 
-    if (isLiked) {
-      likes.remove(myId);
+    if (currentReactions[myId] == reactionKey) {
+      currentReactions.remove(myId); // إلغاء التفاعل عند الضغط على نفس التفاعل
     } else {
-      likes.add(myId);
+      currentReactions[myId] = reactionKey;
     }
 
-    setState(() => post['likes'] = likes);
+    setState(() {
+      post['reactions'] = currentReactions;
+      post['likes'] = currentReactions.keys.toList();
+    });
 
     try {
-      await supabase.from('posts').update({'likes': likes}).eq('id', postId);
+      await supabase.from('posts').update({
+        'reactions': currentReactions,
+        'likes': currentReactions.keys.toList(),
+      }).eq('id', postId);
     } catch (_) {}
   }
 
+  // شريط تفاعلات فيسبوك المنبثق عند الضغط المطول
+  void _showReactionsPopup(BuildContext ctx, Map<String, dynamic> post) {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: ctx,
+      barrierColor: Colors.black26,
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(40),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: _fbReactions.entries.map((entry) {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.pop(dialogCtx);
+                    _setReaction(post, entry.key);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Tooltip(
+                      message: entry.value['label'],
+                      child: Text(
+                        entry.value['emoji'],
+                        style: const TextStyle(fontSize: 32),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // نافذة مشاركة فيسبوك الرسمية (Facebook Share Menu)
+  // ==========================================
+  void _openShareModal(Map<String, dynamic> post) {
+    final myId = supabase.auth.currentUser?.id;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 12),
+              const Text('مشاركة المنشور 🚀', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Divider(),
+
+              // 1. إعادة النشر الفوري على صفحتك
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: FBColors.royalGold,
+                  child: Icon(Icons.repeat, color: Colors.black),
+                ),
+                title: const Text('مشاركة الآن (إعادة نشر على يومياتك)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('سيظهر المنشور في حسابك لجميع أصدقائك'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  if (myId == null) return;
+                  final authorName = post['profiles']?['name'] ?? 'مستخدم';
+                  final originalText = post['text'] ?? '';
+                  final repostContent = '🔄 شارك منشوراً لـ $authorName:\n"$originalText"';
+
+                  await supabase.from('posts').insert({
+                    'user_id': myId,
+                    'text': repostContent,
+                    'image_url': post['image_url'] ?? '',
+                    'likes': [],
+                    'reactions': {},
+                  });
+                  _loadData();
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تمت مشاركة المنشور على صفحتك بنجاح! 👑')));
+                },
+              ),
+
+              // 2. إرسال لصديق في الماسنجر
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFF0084FF),
+                  child: Icon(Icons.send_rounded, color: Colors.white),
+                ),
+                title: const Text('إرسال في رسالة عبر الدردشة', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('أرسل المنشور كرسالة خاصة لأحد أصدقائك'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _chooseFriendToSendPost(post);
+                },
+              ),
+
+              // 3. نسخ الرابط
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: isDark ? Colors.white12 : Colors.grey.shade200,
+                  child: const Icon(Icons.link, color: FBColors.royalGold),
+                ),
+                title: const Text('نسخ رابط المنشور', style: TextStyle(fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Clipboard.setData(ClipboardData(text: 'https://atheer.app/posts/${post['id']}'));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ رابط المنشور إلى الحافظة 📋')));
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // اختيار صديق لإرسال المنشور له في الشات
+  void _chooseFriendToSendPost(Map<String, dynamic> post) async {
+    final myId = supabase.auth.currentUser?.id;
+    if (myId == null) return;
+
+    final users = await supabase.from('profiles').select().neq('id', myId).limit(15);
+
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(14),
+              child: Text('اختر صديقاً لإرسال المنشور له:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                itemCount: users.length,
+                itemBuilder: (cx, i) {
+                  final u = users[i];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: getUniversalImageProvider(u['avatar_url']),
+                      child: (u['avatar_url'] == null || u['avatar_url'] == '') ? Text(getFirstChar(u['name'])) : null,
+                    ),
+                    title: Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    trailing: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: FBColors.royalGold, shape: const StadiumBorder()),
+                      child: const Text('إرسال', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final postSnippet = post['text'] ?? (post['image_url'] != null ? '📷 صورة' : 'منشور');
+                        await supabase.from('messages').insert({
+                          'sender_id': myId,
+                          'receiver_id': u['id'],
+                          'content': '📌 شارك معك منشوراً:\n"$postSnippet"',
+                          'image_url': post['image_url'] ?? '',
+                          'created_at': DateTime.now().toIso8601String(),
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم إرسال المنشور إلى ${u['name']}! 💬')));
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // واجهة المنشورات والستوري
+  // ==========================================
   void _openCreatePostDialog() {
     final textCtrl = TextEditingController();
     String? selectedImgPath;
@@ -239,6 +464,7 @@ class _FeedScreenState extends State<FeedScreen> {
                                   'text': text,
                                   'image_url': imgUrl ?? '',
                                   'likes': [],
+                                  'reactions': {},
                                 });
                               }
                               Navigator.pop(ctx);
@@ -258,7 +484,6 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  // إضافة قصة مع حفظ الرابط في الحقلين media_url و image_url لتظهر 100% للجميع
   Future<void> _addStory() async {
     final f = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75, maxWidth: 1000);
     if (f == null) return;
@@ -349,7 +574,7 @@ class _FeedScreenState extends State<FeedScreen> {
                             controller: replyCtrl,
                             style: const TextStyle(color: Colors.white),
                             decoration: InputDecoration(
-                              hintText: 'إرسال رد ملوكي...',
+                              hintText: 'إرسال رد...',
                               hintStyle: const TextStyle(color: Colors.white70),
                               filled: true,
                               fillColor: Colors.white24,
@@ -371,19 +596,6 @@ class _FeedScreenState extends State<FeedScreen> {
                               'created_at': DateTime.now().toIso8601String(),
                             });
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال الرد في المحادثة! 💬')));
-                          },
-                        ),
-                        IconButton(
-                          icon: const Text('❤️', style: TextStyle(fontSize: 24)),
-                          onPressed: () async {
-                            if (myId == null) return;
-                            Navigator.pop(ctx);
-                            await supabase.from('messages').insert({
-                              'sender_id': myId,
-                              'receiver_id': story['user_id'],
-                              'content': 'تفاعل مع قصتك ❤️',
-                              'created_at': DateTime.now().toIso8601String(),
-                            });
                           },
                         ),
                       ],
@@ -521,7 +733,6 @@ class _FeedScreenState extends State<FeedScreen> {
     final goldAccent = isDark ? FBColors.royalGold : FBColors.darkAntiqueGold;
 
     return Scaffold(
-      // الشريط العلوي الملوكي المستعاد مع زر التبديل والشات
       appBar: AppBar(
         elevation: 0.5,
         backgroundColor: isDark ? FBColors.darkBg : FBColors.lightBg,
@@ -541,27 +752,23 @@ class _FeedScreenState extends State<FeedScreen> {
           ],
         ),
         actions: [
-          // زر التبديل بين الوضع النهاري والمظلم (شمس ☀️ / قمر 🌙)
           IconButton(
             icon: Icon(
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
               color: FBColors.royalGold,
               size: 24,
             ),
-            tooltip: isDark ? 'التحويل للوضع النهاري اللؤلؤي' : 'التحويل للوضع الليلي الملوكي',
+            tooltip: isDark ? 'الوضع النهاري' : 'الوضع الليلي',
             onPressed: () async {
               await toggleAppTheme();
               if (mounted) setState(() {});
             },
           ),
-          // زر فتح الدردشات والماسنجر
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline_rounded, color: FBColors.royalGold, size: 22),
             tooltip: 'المحادثات',
             onPressed: () {
-              if (widget.onOpenChat != null) {
-                widget.onOpenChat!();
-              }
+              if (widget.onOpenChat != null) widget.onOpenChat!();
             },
           ),
           const SizedBox(width: 4),
@@ -621,7 +828,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
                   const SizedBox(height: 8),
 
-                  // شريط القصص (الستوري) الملوكي
+                  // شريط القصص (الستوري)
                   Container(
                     color: Theme.of(context).cardColor,
                     height: 190,
@@ -750,8 +957,26 @@ class _FeedScreenState extends State<FeedScreen> {
                   else
                     ..._posts.map((post) {
                       final author = post['profiles'];
-                      final likes = List.from(post['likes'] ?? []);
-                      final bool hasLiked = myId != null && likes.contains(myId);
+                      final reactionsMap = _extractReactions(post);
+                      final int reactionsCount = reactionsMap.length;
+                      final String? myReactionKey = myId != null ? reactionsMap[myId] : null;
+
+                      // تجميع أكثر الإيموجيات تكراراً لعرضها مثل فيسبوك
+                      final Set<String> topEmojis = {};
+                      for (var val in reactionsMap.values) {
+                        if (_fbReactions.containsKey(val)) {
+                          topEmojis.add(_fbReactions[val]!['emoji']);
+                        }
+                      }
+                      if (topEmojis.isEmpty && reactionsCount > 0) topEmojis.add('👍');
+
+                      // تخصيص زر التفاعل الحالي
+                      final reactionData = myReactionKey != null ? _fbReactions[myReactionKey] : null;
+                      final Color buttonColor = reactionData != null ? reactionData['color'] : (isDark ? Colors.white70 : Colors.black87);
+                      final String buttonLabel = reactionData != null ? reactionData['label'] : 'أعجبني';
+                      final Widget buttonIcon = reactionData != null
+                          ? Text(reactionData['emoji'], style: const TextStyle(fontSize: 18))
+                          : Icon(Icons.thumb_up_outlined, color: Colors.grey, size: 19);
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
@@ -795,19 +1020,27 @@ class _FeedScreenState extends State<FeedScreen> {
                                 child: renderUniversalImage(post['image_url'], width: double.infinity, fit: BoxFit.cover),
                               ),
 
+                            // شريط إحصائيات التفاعل والتعليقات
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               child: Row(
                                 children: [
-                                  if (likes.isNotEmpty) ...[
-                                    const Icon(Icons.thumb_up, color: FBColors.royalGold, size: 14),
+                                  if (reactionsCount > 0) ...[
+                                    Row(
+                                      children: topEmojis.take(3).map((em) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(left: 2),
+                                          child: Text(em, style: const TextStyle(fontSize: 15)),
+                                        );
+                                      }).toList(),
+                                    ),
                                     const SizedBox(width: 4),
-                                    Text('${likes.length}', style: TextStyle(fontSize: 12, color: goldAccent, fontWeight: FontWeight.bold)),
+                                    Text('$reactionsCount', style: TextStyle(fontSize: 12, color: goldAccent, fontWeight: FontWeight.bold)),
                                   ],
                                   const Spacer(),
                                   GestureDetector(
                                     onTap: () => _openCommentsModal(post),
-                                    child: const Text('تعليقات', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                    child: const Text('التعليقات', style: TextStyle(fontSize: 12, color: Colors.grey)),
                                   ),
                                 ],
                               ),
@@ -815,19 +1048,36 @@ class _FeedScreenState extends State<FeedScreen> {
 
                             const Divider(height: 1),
 
+                            // أزرار التفاعل والمشاركة بنمط فيسبوك الرسمي
                             Row(
                               children: [
+                                // زر التفاعل (ضغطة سريعة = أعجبني، ضغطة مطولة = شريط التفاعلات المنبثق)
                                 Expanded(
-                                  child: TextButton.icon(
-                                    icon: Icon(
-                                      hasLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                                      color: hasLiked ? goldAccent : Colors.grey,
-                                      size: 19,
+                                  child: InkWell(
+                                    onTap: () => _setReaction(post, myReactionKey == null ? 'like' : myReactionKey),
+                                    onLongPress: () => _showReactionsPopup(context, post),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          buttonIcon,
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            buttonLabel,
+                                            style: TextStyle(
+                                              color: buttonColor,
+                                              fontSize: 13,
+                                              fontWeight: myReactionKey != null ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    label: Text('أعجبني', style: TextStyle(color: hasLiked ? goldAccent : (isDark ? Colors.white70 : Colors.black87), fontSize: 13, fontWeight: hasLiked ? FontWeight.bold : FontWeight.normal)),
-                                    onPressed: () => _toggleLike(post),
                                   ),
                                 ),
+
+                                // زر التعليق
                                 Expanded(
                                   child: TextButton.icon(
                                     icon: const Icon(Icons.chat_bubble_outline, color: Colors.grey, size: 19),
@@ -835,11 +1085,13 @@ class _FeedScreenState extends State<FeedScreen> {
                                     onPressed: () => _openCommentsModal(post),
                                   ),
                                 ),
+
+                                // زر المشاركة فيسبوك
                                 Expanded(
                                   child: TextButton.icon(
                                     icon: const Icon(Icons.share_outlined, color: Colors.grey, size: 19),
                                     label: Text('مشاركة', style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 13)),
-                                    onPressed: () {},
+                                    onPressed: () => _openShareModal(post),
                                   ),
                                 ),
                               ],

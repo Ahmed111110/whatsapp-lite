@@ -1,27 +1,3 @@
-'avatar_url': avatar}),
-^^^^^^^^^
-Target kernel_snapshot_program failed: Exception
-```[span_1](start_span)[span_1](end_span)
-
-### ما هو سبب الخطأ؟
-في ملف **`lib/screens/profile_screen.dart`**، عند الضغط على زر "مراسلة"، كنا نمرر بيانات الحساب كـ:
-`_profile ?? {'id': _targetId, 'name': name, 'avatar_url': avatar}`
-
-فلاتر اعتبر القوس الثاني من نوع نصوص فقط (`Map<String, String>`) بينما شاشة الشات تطلب (`Map<String, dynamic>`)، وهذا أدى لتوقف بناء التطبيق فوراً[span_2](start_span)[span_2](end_span).
-
----
-
-### الحل (خلال دقيقة واحدة):
-
-سنقوم بتحديث ملف **`lib/screens/profile_screen.dart`** لضبط النوع البرمجي بدقة وتفادي هذا الخطأ نهائياً.
-
-1. افتح مستودعك في **GitHub**.
-2. ادخل إلى مجلد **`lib`** ثم مجلد **`screens`**.
-3. اضغط على ملف **`profile_screen.dart`**.
-4. اضغط على القلم **✏️**.
-5. امسح الكود بالكامل وضع هذا الكود المصحح والمضبوط:
-
-```dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -382,7 +358,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // هنا تم تصحيح نوع البيانات بدقة عالية
                           Expanded(
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
@@ -394,9 +369,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               icon: const Icon(Icons.chat_bubble, color: FBColors.primaryBlue, size: 18),
                               label: Text('مراسلة', style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
                               onPressed: () {
-                                final Map<String, dynamic> targetData = _profile != null
-                                    ? Map<String, dynamic>.from(_profile!)
-                                    : <String, dynamic>{'id': _targetId, 'name': name, 'avatar_url': avatar};
+                                final dynamic targetData = _profile ?? <String, dynamic>{'id': _targetId, 'name': name, 'avatar_url': avatar};
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(

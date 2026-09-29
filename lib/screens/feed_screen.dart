@@ -74,6 +74,7 @@ class _FeedScreenState extends State<FeedScreen> {
   Future<void> _loadData() async {
     final myId = supabase.auth.currentUser?.id;
     try {
+      // 1. جلب بروفايل المستخدم الحالي
       if (myId != null) {
         final p = await supabase.from('profiles').select().eq('id', myId).maybeSingle();
         if (p != null) {
@@ -83,21 +84,54 @@ class _FeedScreenState extends State<FeedScreen> {
         }
       }
 
-      final postsRes = await supabase.from('posts').select('*, profiles(name, avatar_url)').order('created_at', ascending: false).limit(30);
-      final storiesRes = await supabase.from('stories').select('*, profiles(name, avatar_url)').order('created_at', ascending: false).limit(20);
+      // 2. جلب المنشورات بأمان بدون اشتراط علاقة الربط المعقدة
+      final postsRaw = await supabase.from('posts').select().order('created_at', ascending: false).limit(40);
+      final List<Map<String, dynamic>> loadedPosts = List<Map<String, dynamic>>.from(postsRaw);
+
+      // 3. جلب القصص بأمان
+      final storiesRaw = await supabase.from('stories').select().order('created_at', ascending: false).limit(30);
+      final List<Map<String, dynamic>> loadedStories = List<Map<String, dynamic>>.from(storiesRaw);
+
+      // 4. تجميع كافة معرفات أصحاب المنشورات والقصص لجلب أسمائهم وصورهم دفعة واحدة
+      final Set<String> userIds = {};
+      for (var post in loadedPosts) {
+        if (post['user_id'] != null) userIds.add(post['user_id'].toString());
+      }
+      for (var story in loadedStories) {
+        if (story['user_id'] != null) userIds.add(story['user_id'].toString());
+      }
+
+      if (userIds.isNotEmpty) {
+        final profilesRes = await supabase.from('profiles').select().filter('id', 'in', userIds.toList());
+        final Map<String, dynamic> profilesMap = {
+          for (var item in profilesRes) item['id'].toString(): item
+        };
+
+        // دمج بيانات صاحب المنشور داخل كل منشور
+        for (var post in loadedPosts) {
+          final authorId = post['user_id']?.toString() ?? '';
+          post['profiles'] = profilesMap[authorId] ?? {'name': 'مستخدم أثير', 'avatar_url': ''};
+        }
+
+        // دمج بيانات صاحب القصة داخل كل قصة
+        for (var story in loadedStories) {
+          final authorId = story['user_id']?.toString() ?? '';
+          story['profiles'] = profilesMap[authorId] ?? {'name': 'مستخدم أثير', 'avatar_url': ''};
+        }
+      }
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('atheer_cached_posts', jsonEncode(postsRes));
-      await prefs.setString('atheer_cached_stories', jsonEncode(storiesRes));
+      await prefs.setString('atheer_cached_posts', jsonEncode(loadedPosts));
+      await prefs.setString('atheer_cached_stories', jsonEncode(loadedStories));
 
       if (mounted) {
         setState(() {
-          _posts = List<Map<String, dynamic>>.from(postsRes);
-          _stories = List<Map<String, dynamic>>.from(storiesRes);
+          _posts = loadedPosts;
+          _stories = loadedStories;
           _loading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -419,7 +453,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 const Divider(),
                 Expanded(
                   child: FutureBuilder(
-                    future: supabase.from('comments').select('*, profiles(name, avatar_url)').eq('post_id', postId).order('created_at', ascending: true),
+                    future: supabase.from('comments').select().eq('post_id', postId).order('created_at', ascending: true),
                     builder: (ctx, AsyncSnapshot snap) {
                       if (!snap.hasData) return const Center(child: CircularProgressIndicator(color: FBColors.primaryBlue));
                       final comments = List<Map<String, dynamic>>.from(snap.data);
@@ -429,12 +463,8 @@ class _FeedScreenState extends State<FeedScreen> {
                         itemBuilder: (cx, idx) {
                           final item = comments[idx];
                           return ListTile(
-                            leading: CircleAvatar(
-                              radius: 16,
-                              backgroundImage: getUniversalImageProvider(item['profiles']?['avatar_url']),
-                            ),
-                            title: Text(item['profiles']?['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            subtitle: Text(item['content'] ?? '', style: const TextStyle(fontSize: 13.5)),
+                            title: Text(item['content'] ?? '', style: const TextStyle(fontSize: 13.5)),
+                            subtitle: Text(formatArabicTime(item['created_at']), style: const TextStyle(fontSize: 10, color: Colors.grey)),
                           );
                         },
                       );
